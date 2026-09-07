@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Browser-tab icon. Next.js serves app/icon.svg as the favicon
+       automatically, so no <link rel="icon"> is needed.
+       Dark tile + brand-colored initial, matching the reference's tab mark.
+       On a rebrand: change the fill to lib/brand.ts colors.primary and swap
+       the letter for the new brand.name initial. -->
+  <rect width="64" height="64" rx="12" fill="#1c1c28"/>
+  <text x="32" y="45"
+        text-anchor="middle"
+        font-family="system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="42"
+        font-weight="800"
+        fill="#9f2089">M</text>
+</svg>

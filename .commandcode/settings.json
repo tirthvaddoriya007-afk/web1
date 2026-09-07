@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(node \"C:\\Users\\tanvi\\AppData\\Local\\Temp\\commandcode\\C--Users-tanvi-homeshopedeals\\5bfbb70e-cd61-4817-8891-fc67ed80a8f0\\scratchpad\\extract-meesho-logo.js\")",
+      "powershell",
+      "Shell(node \"C:\\Users\\tanvi\\AppData\\Local\\Temp\\commandcode\\C--Users-tanvi-homeshopedeals\\5bfbb70e-cd61-4817-8891-fc67ed80a8f0\\scratchpad\\clean-meesho-logo.js\")",
+      "Shell(file \"C:\\Users\\tanvi\\homeshopedeals\\app\\icon.svg\" 2>nul || powershell -NoProfile -Command \"$bytes = [System.IO.File]::ReadAllBytes('C:\\Users\\tanvi\\homeshopedeals\\app\\icon.svg'); 'first bytes: ' + (($bytes[0..3] | ForEach-Object { $_.ToString('X2') }) -join ' '); 'size: ' + $bytes.Length\")"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "slug": "grocery",
+    "origSlug": "grocery-",
+    "name": "Grocery",
+    "count": 41
+  },
+  {
+    "slug": "mobiles",
+    "origSlug": "mobiles",
+    "name": "Mobiles",
+    "count": 15
+  },
+  {
+    "slug": "home-and-kitchen",
+    "origSlug": "home-and-kitchen",
+    "name": "Home and Kitchen",
+    "count": 81
+  },
+  {
+    "slug": "tv-appliances",
+    "origSlug": "tv--appliances-",
+    "name": "TV & Appliances",
+    "count": 48
+  },
+  {
+    "slug": "smart-gadget",
+    "origSlug": "smart-gadget",
+    "name": "Smart Gadget",
+    "count": 46
+  },
+  {
+    "slug": "electronics-accesories",
+    "origSlug": "electronics--accesories",
+    "name": "Electronics & Accesories",
+    "count": 16
+  },
+  {
+    "slug": "aristocrat",
+    "origSlug": "aristocrat-",
+    "name": "Aristocrat",
+    "count": 39
+  },
+  {
+    "slug": "women-fashion",
+    "origSlug": "women-fashion",
+    "name": "Women Fashion",
+    "count": 33
+  },
+  {
+    "slug": "men-fashion",
+    "origSlug": "men-fashion",
+    "name": "Men Fashion",
+    "count": 31
+  },
+  {
+    "slug": "footware",
+    "origSlug": "footware",
+    "name": "Footware",
+    "count": 33
+  },
+  {
+    "slug": "beauty-toys-sports",
+    "origSlug": "beauty-toys--sports",
+    "name": "Beauty, Toys & Sports",
+    "count": 12
+  }
+]
