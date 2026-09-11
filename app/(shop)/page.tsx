@@ -13,17 +13,17 @@ export default function HomePage() {
     <>
       {/* 1. Top promo strip (above carousel) */}
       <div className="mb-1.5">
-        <Banner src="/banners/top.gif" href="/category/grocery" alt="Sale is live" />
+        <Banner src="/banners/top.gif" href="/category/grocery" alt="Sale is live" priority width={1200} height={120} />
       </div>
 
       {/* 2. Main hero / carousel banner */}
-      <Banner src="/banners/hero.webp" href="/category/grocery" alt="Mega Sale" />
+      <Banner src="/banners/hero.webp" href="/category/grocery" alt="Mega Sale" priority width={800} height={333} />
 
       {/* 3. Purple promo marquee */}
       <Marquee />
 
       {/* 4. Below-marquee banner (trust badges strip) */}
-      <Banner src="/banners/below-marquee.webp" alt="Easy returns, Cash on delivery, Lowest price" />
+      <Banner src="/banners/below-marquee.webp" alt="Easy returns, Cash on delivery, Lowest price" width={720} height={112} />
 
       {/* 5. Daily Deals header + countdown */}
       <DealsBar />

@@ -56,7 +56,8 @@ export default function ProductFeed({
       <div className="product-grid">
         {items.map((p, i) =>
           i < 2 ? (
-            <ProductCard key={p.hash} product={p} />
+            // First row is the first thing a user scrolls to — load eagerly.
+            <ProductCard key={p.hash} product={p} priority />
           ) : (
             <ProductCardOffer key={p.hash} product={p} />
           )

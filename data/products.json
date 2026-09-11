@@ -16,16 +16,44 @@
   {
     "id": null,
     "hash": "c410003ef13d451727aeff9082c29a5c",
-    "name": "(4KG - 1Kg*4) Dry Fruits Combo Pack of 4 - (Almonds, Cashews, Pistachios, Raisins) - Healthy Dry Fruit Snacks | Tasty & Delicious, Rich in Protein | High in Protein, Fiber & Boost Immunity | Real Nuts | Gluten-Free | Super Healthy Nuts",
-    "price": 279,
-    "mrp": 2999,
+    "name": "Almonds, Cashews, Walnut, Black Raisins, Fig - Healthy Dry Fruit Snacks | Tasty & Delicious, Rich in Protein | High in Protein, Fiber & Boost Immunity | Real Nuts | Gluten-Free | Super Healthy Nuts",
+    "price": 349,
+    "mrp": 3999,
     "off": "91% off",
-    "image": "/products/c410003ef13d451727aeff9082c29a5c.png",
+    "image": "/products/np2-dryfruits-combo.webp",
     "badge": "",
     "categories": [
       "Grocery"
     ],
     "category": "Grocery"
+  },
+  {
+    "id": null,
+    "hash": "0385bacbe1344309203740e795b09581",
+    "name": "SOROS Foldable Clothes Dryer Stand Racks for Drying - Multi Way Folding & Rotatable - Lightweight Heavy Duty Aluminium Rails - (White, 3.9 Feet Length, 16 Rods, Large)",
+    "price": 229,
+    "mrp": 3899,
+    "off": "94% off",
+    "image": "/products/np3-cloth-dryer.webp",
+    "badge": "",
+    "categories": [
+      "Home and Kitchen"
+    ],
+    "category": "Home and Kitchen"
+  },
+  {
+    "id": null,
+    "hash": "486b61a55553cac125042eb4bf8d0e08",
+    "name": "O'Reilly Double Seater Sofa Bed, Brown Leather",
+    "price": 699,
+    "mrp": 30999,
+    "off": "98% off",
+    "image": "/products/np4-sofa-bed.gif",
+    "badge": "",
+    "categories": [
+      "Home and Kitchen"
+    ],
+    "category": "Home and Kitchen"
   },
   {
     "id": null,

@@ -64,7 +64,7 @@ export default function ProductPage({ params }: { params: { hash: string } }) {
       <div className="bg-white px-4 pt-4">
         <div className="w-full aspect-square bg-[#f7f7f9] rounded-lg overflow-hidden flex items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
+          <img src={product.image} alt={product.name} className="w-full h-full object-contain" fetchPriority="high" decoding="async" />
         </div>
         <div className="flex justify-center py-3">
           <span className="w-6 h-1 rounded-full" style={{ background: "var(--brand)" }} />
@@ -212,7 +212,7 @@ export default function ProductPage({ params }: { params: { hash: string } }) {
               </div>
               <p className="text-[13px] mt-2 text-[#353543]">{r.text}</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={r.image} alt="" width={48} height={48} className="w-12 h-12 object-cover rounded mt-2 bg-[#f7f7f9]" />
+              <img src={r.image} alt="" width={48} height={48} className="w-12 h-12 object-cover rounded mt-2 bg-[#f7f7f9]" loading="lazy" decoding="async" />
               <p className="text-[13px] text-[#666] mt-2 flex items-center gap-1.5">
                 {/* filled thumbs-up, matching the reference glyph */}
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="#666" aria-hidden>
@@ -292,7 +292,7 @@ function ThumbLink({ href, src, active }: { href: string; src: string; active?: 
       style={{ border: active ? "1.5px solid var(--brand)" : "1px solid #eee" }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className="w-full h-full object-contain" />
+      <img src={src} alt="" className="w-full h-full object-contain" loading="lazy" decoding="async" />
     </Link>
   );
 }

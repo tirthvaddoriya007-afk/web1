@@ -7,7 +7,7 @@ import { formatPrice, seededRandom } from "@/lib/data";
 import { useCountdown, fmtCountdown } from "@/lib/countdown";
 import TimerIcon from "./TimerIcon";
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const router = useRouter();
   const t = useCountdown();
 
@@ -32,7 +32,13 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="pc-img">
           {showHot && <span className="hot-badge">Hot Sell</span>}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={product.image} alt={product.name} loading="lazy" />
+          <img
+            src={product.image}
+            alt={product.name}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "low"}
+            decoding="async"
+          />
         </div>
         <h3 className="pc-name">{product.name}</h3>
         <div className="pc-price">

@@ -1,38 +1,67 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { formatPrice, seededRandom, specialOffer } from "@/lib/data";
 
 /**
  * Catalog card in the "offer pill + Free Delivery" style used on category
- * pages and the product page's "Products For You" grid (no timer / Buy Now).
+ * pages and the product page's "Products For You" grid. Includes the same
+ * Buy Now button as the home-feed card.
  */
 export default function ProductCardOffer({ product }: { product: Product }) {
+  const router = useRouter();
   const rnd = seededRandom(product.hash);
   const rating = (rnd() * (5 - 4) + 4).toFixed(1);
   const count = Math.floor(rnd() * 4900) + 100;
   const offer = specialOffer(product.hash, product.price);
 
+  // Buy Now opens the product page (no direct add-to-cart).
+  const buyNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/product/${product.hash}`);
+  };
+
   return (
-    <Link href={`/product/${product.hash}`} className="pc">
-      <div className="pc-img">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={product.image} alt={product.name} loading="lazy" />
-      </div>
-      <h3 className="pc-name">{product.name}</h3>
-      <div className="pc-price">
-        <span className="pc-sell">{formatPrice(product.price)}</span>
-        {product.mrp > product.price && (
-          <span className="pc-mrp">{formatPrice(product.mrp)}</span>
-        )}
-        {product.off && <span className="pc-off">{product.off}</span>}
-      </div>
+    <div className="pc">
+      <Link href={`/product/${product.hash}`} className="pc-link">
+        <div className="pc-img">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            fetchPriority="low"
+            decoding="async"
+          />
+        </div>
+        <h3 className="pc-name">{product.name}</h3>
+        <div className="pc-price">
+          <span className="pc-sell">{formatPrice(product.price)}</span>
+          {product.mrp > product.price && (
+            <span className="pc-mrp">{formatPrice(product.mrp)}</span>
+          )}
+          {product.off && <span className="pc-off">{product.off}</span>}
+        </div>
 
-      <div className="pc-offer">
-        <span className="pc-offer-ico">₹</span>
-        ₹{offer.amount} with {offer.count} Special Offers
-      </div>
+        <div className="pc-offer">
+          <span className="pc-offer-ico">₹</span>
+          ₹{offer.amount} with {offer.count} Special Offers
+        </div>
 
-      <p className="pc-free">Free Delivery</p>
+        <p className="pc-free">Free Delivery</p>
+      </Link>
+
+      {/* Buy Now */}
+      <button className="pc-buy" onClick={buyNow}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" aria-hidden>
+          <path d="M4 5v14l8-7-8-7z" />
+          <path d="M13 5v14l8-7-8-7z" />
+        </svg>
+        Buy Now
+      </button>
 
       <div className="pc-rating-row">
         <span className="pc-rating">
@@ -50,6 +79,6 @@ export default function ProductCardOffer({ product }: { product: Product }) {
           Trusted
         </span>
       </div>
-    </Link>
+    </div>
   );
 }

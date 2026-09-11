@@ -112,7 +112,7 @@ export default function Header() {
           <Link href="/" className="flex items-center gap-2 no-underline">
             {brand.logoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logoSrc} alt={brand.name} className="h-6 w-auto" />
+              <img src={brand.logoSrc} alt={brand.name} className="h-6 w-auto" fetchPriority="high" decoding="async" />
             ) : (
               <span className="text-xl font-extrabold tracking-tight" style={{ color: "var(--brand-dark)" }}>
                 {brand.name}
