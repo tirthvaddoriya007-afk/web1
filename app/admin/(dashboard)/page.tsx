@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import UpiSettingsForm from "./UpiSettingsForm";
 
 export const dynamic = "force-dynamic";
+// Never serve a cached settings row — the form must show what is actually
+// saved after an update (Next 14 fetch cache would otherwise keep the old one).
+export const fetchCache = "force-no-store";
 
 export default async function AdminSettingsPage() {
   const supabase = createClient();

@@ -4,6 +4,8 @@ import { brand } from "@/lib/brand";
 import SignOutButton from "./SignOutButton";
 
 export const dynamic = "force-dynamic";
+// The admin allowlist check must always hit Supabase fresh (no cached auth).
+export const fetchCache = "force-no-store";
 
 export default async function AdminLayout({
   children,
