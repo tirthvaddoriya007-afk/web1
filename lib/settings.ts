@@ -7,7 +7,14 @@ function anonClient() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      // cache: "no-store" — otherwise Next 14's data cache can keep serving a
+      // stale settings row (e.g. an old pixel ID) on Vercel after an admin save.
+      global: {
+        fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+      },
+    }
   );
 }
 
