@@ -2,6 +2,7 @@ import Marquee from "@/components/Marquee";
 import DealsBar from "@/components/DealsBar";
 import ProductFeed from "@/components/ProductFeed";
 import Banner from "@/components/Banner";
+import MetaPixel from "@/components/MetaPixel";
 import { getProductPage } from "@/lib/data";
 
 export default function HomePage() {
@@ -30,6 +31,9 @@ export default function HomePage() {
 
       {/* Product feed */}
       <ProductFeed initialItems={first.products} initialTotalPage={first.total_page} />
+
+      {/* Meta Pixel — PageView fires automatically on home page load */}
+      <MetaPixel pageView />
     </>
   );
 }

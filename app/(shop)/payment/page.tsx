@@ -1,4 +1,5 @@
 import { getUpiConfig } from "@/lib/settings";
+import MetaPixel from "@/components/MetaPixel";
 import PaymentClient from "./PaymentClient";
 
 // Read on every request so a UPI ID saved in /admin takes effect immediately.
@@ -9,5 +10,11 @@ export const fetchCache = "force-no-store";
 
 export default async function PaymentPage() {
   const upi = await getUpiConfig();
-  return <PaymentClient upi={upi} />;
+  return (
+    <>
+      <PaymentClient upi={upi} />
+      {/* Pixel library only — Purchase fires on the Pay Now click */}
+      <MetaPixel />
+    </>
+  );
 }

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
+import MetaPixel from "@/components/MetaPixel";
+import { trackPixel } from "@/lib/pixel";
 
 export default function CartPage() {
   const { items, total, payable, setQty, removeItem, ready } = useStore();
@@ -95,10 +97,17 @@ export default function CartPage() {
         </div>
         {/* Continue — 179.2 × 44, 15px "Mier demi", #FFFFFF on #9F2089, padding
             12px. Metrics come from the shared .action-bar CTA rule. */}
-        <Link href="/address" className="btn-brand no-underline">
+        <Link
+          href="/address"
+          className="btn-brand no-underline"
+          onClick={() => trackPixel("InitiateCheckout", { value: payable, currency: "INR" })}
+        >
           Continue
         </Link>
       </div>
+
+      {/* Pixel library only — InitiateCheckout fires on the Continue click */}
+      <MetaPixel />
     </div>
   );
 }

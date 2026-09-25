@@ -9,10 +9,13 @@ export interface UpiSettings {
   upi_vpa: string;
   upi_payee_name: string;
   upi_merchant_code: string;
+  meta_pixel_id: string;
 }
 
 // A UPI ID / VPA looks like `name@bank`: no spaces, exactly one "@".
 const VPA_RE = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+// Meta Pixel IDs are numeric, e.g. 4872181146361011.
+const PIXEL_RE = /^\d{8,20}$/;
 
 export default function UpiSettingsForm({ initial }: { initial: UpiSettings }) {
   const router = useRouter();
@@ -29,9 +32,14 @@ export default function UpiSettingsForm({ initial }: { initial: UpiSettings }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const vpa = form.upi_vpa.trim();
+    const pixelId = form.meta_pixel_id.trim();
 
     if (!VPA_RE.test(vpa)) {
       setError("Enter a valid UPI ID, e.g. yourname@okhdfcbank");
+      return;
+    }
+    if (pixelId && !PIXEL_RE.test(pixelId)) {
+      setError("Meta Pixel ID must be numeric, e.g. 4872181146361011");
       return;
     }
 
@@ -42,6 +50,7 @@ export default function UpiSettingsForm({ initial }: { initial: UpiSettings }) {
         upi_vpa: vpa,
         upi_payee_name: form.upi_payee_name.trim(),
         upi_merchant_code: form.upi_merchant_code.trim(),
+        meta_pixel_id: pixelId,
       })
       .eq("id", 1);
 
@@ -78,6 +87,13 @@ export default function UpiSettingsForm({ initial }: { initial: UpiSettings }) {
         onChange={set("upi_merchant_code")}
         placeholder=""
         hint="Leave blank for a personal UPI ID."
+      />
+      <Field
+        label="Meta Pixel ID (optional)"
+        value={form.meta_pixel_id}
+        onChange={set("meta_pixel_id")}
+        placeholder="4872181146361011"
+        hint="Tracks PageView / InitiateCheckout / Purchase events. Leave blank to disable the pixel."
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}

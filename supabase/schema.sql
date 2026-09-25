@@ -40,8 +40,12 @@ create table if not exists public.settings (
   upi_vpa        text not null default '',
   upi_payee_name text not null default '',
   upi_merchant_code text not null default '',
+  meta_pixel_id  text not null default '',
   updated_at     timestamptz not null default now()
 );
+
+-- Existing databases (created before meta_pixel_id) — run this once:
+-- alter table public.settings add column if not exists meta_pixel_id text not null default '';
 
 -- Seed the single row so the admin screen always has something to update.
 insert into public.settings (id) values (1) on conflict (id) do nothing;
