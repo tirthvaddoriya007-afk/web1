@@ -30,6 +30,19 @@ export const emptyUpiConfig: UpiConfig = {
 export type UpiApp = "gpay" | "phonepe" | "paytm";
 
 /**
+ * True on iPhone/iPad (including iPads that report as Mac desktops) — the
+ * reference store's detection. PhonePe's `phonepe://native?...&id=p2ppayment`
+ * collect route only exists in the Android app, so iOS needs a different link.
+ */
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
  * Base64 JSON payload for PhonePe's native P2P collect screen
  * (`phonepe://native?data=<this>&id=p2ppayment`).
  *
@@ -85,6 +98,19 @@ export function buildUpiLink(opts: {
   const { config, app, amount } = opts;
   const vpa = config.vpa.trim();
   const payeeName = config.payeeName.trim() || "Merchant";
+
+  // iOS only: the reference store routes every UPI button through PhonePe's
+  // pay screen — the `phonepe:upi://pay` intent is the one the iPhone app
+  // understands. Android keeps the app-specific links below, untouched.
+  if (isIOS()) {
+    return (
+      `phonepe:upi://pay?pa=${encodeURIComponent(vpa)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&am=${amount.toFixed(2)}` +
+      `&cu=INR` +
+      `&tn=${encodeURIComponent(payeeName)}`
+    );
+  }
 
   if (app === "paytm") {
     const amt = amount.toFixed(2);
