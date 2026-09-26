@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAdminUser } from "@/lib/supabase/server";
 import { brand } from "@/lib/brand";
@@ -26,6 +27,12 @@ export default async function AdminLayout({
         <div className="mx-auto max-w-2xl px-4 h-14 flex items-center justify-between">
           <span className="font-semibold">{brand.name} Admin</span>
           <div className="flex items-center gap-3 text-sm">
+            <Link
+              href="/admin/analytics"
+              className="opacity-80 hover:opacity-100 hover:underline"
+            >
+              Analytics
+            </Link>
             <span className="opacity-80 hidden sm:inline">
               {session.admin.email}
             </span>
