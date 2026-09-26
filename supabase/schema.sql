@@ -199,3 +199,64 @@ as $$
                from recent)
   );
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 5. PAY CLICKS — one row every time a visitor taps the payment page's
+--    Pay Now / Place Order button. Written by /api/pay-click. Lets the admin
+--    see exactly how many people reached the final checkout step and which
+--    payment method they chose.
+-- ---------------------------------------------------------------------------
+create table if not exists public.pay_clicks (
+  id         bigint generated always as identity primary key,
+  visitor_id uuid not null,
+  method     text not null default '',   -- 'gpay' | 'phonepe' | 'paytm' | 'cod'
+  amount     numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pay_clicks_created_at_idx on public.pay_clicks (created_at desc);
+
+-- RLS: anyone on the storefront may record a click; only admins may read.
+alter table public.pay_clicks enable row level security;
+
+drop policy if exists pay_clicks_insert on public.pay_clicks;
+create policy pay_clicks_insert on public.pay_clicks
+  for insert to anon, authenticated with check (true);
+
+drop policy if exists pay_clicks_select on public.pay_clicks;
+create policy pay_clicks_select on public.pay_clicks
+  for select using (public.is_admin());
+
+-- One call returns everything the dashboard needs for the pay button:
+-- totals, today's number, per-method breakdown and recent clicks.
+create or replace function public.pay_clicks_stats()
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  with today_rows as (
+    select * from public.pay_clicks
+    where created_at >= (date_trunc('day', now() at time zone 'Asia/Kolkata')
+                         at time zone 'Asia/Kolkata')
+  ),
+  by_method as (
+    select method, count(*) as clicks, coalesce(sum(amount), 0) as amount
+    from public.pay_clicks group by method order by clicks desc
+  ),
+  recent as (
+    select method, amount, created_at
+    from public.pay_clicks order by created_at desc limit 10
+  )
+  select jsonb_build_object(
+    'total', (select count(*) from public.pay_clicks),
+    'today', (select count(*) from today_rows),
+    'total_amount', (select coalesce(sum(amount), 0) from public.pay_clicks),
+    'by_method', (select coalesce(jsonb_agg(jsonb_build_object(
+                  'method', method, 'clicks', clicks, 'amount', amount)),
+                  '[]'::jsonb) from by_method),
+    'recent', (select coalesce(jsonb_agg(jsonb_build_object(
+               'method', method, 'amount', amount, 'created_at', created_at)),
+               '[]'::jsonb) from recent)
+  );
+$$;

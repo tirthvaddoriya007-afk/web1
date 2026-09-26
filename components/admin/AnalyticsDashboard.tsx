@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { brand } from "@/lib/brand";
+import { formatPrice } from "@/lib/data";
 
 export interface AnalyticsStats {
   days: number;
@@ -34,6 +35,21 @@ export interface AnalyticsStats {
     created_at: string;
   }>;
 }
+
+export interface PayClickStats {
+  total: number;
+  today: number;
+  total_amount: number;
+  by_method: Array<{ method: string; clicks: number; amount: number }>;
+  recent: Array<{ method: string; amount: number; created_at: string }>;
+}
+
+const METHOD_LABELS: Record<string, string> = {
+  gpay: "Google Pay",
+  phonepe: "PhonePe",
+  paytm: "Paytm",
+  cod: "Cash on Delivery",
+};
 
 const PIE_COLORS = ["#9f2089", "#570b47", "#c2410c", "#0e7490", "#65a30d", "#7c3aed"];
 
@@ -58,9 +74,11 @@ const nf = new Intl.NumberFormat("en-IN");
 
 export default function AnalyticsDashboard({
   stats,
+  payClicks,
   days,
 }: {
   stats: AnalyticsStats | null;
+  payClicks: PayClickStats | null;
   days: number;
 }) {
   if (!stats || stats.totals.views === 0) {
@@ -148,6 +166,79 @@ export default function AnalyticsDashboard({
           value={`${webviewShare}%`}
           hint="FB / IG / WhatsApp in-app"
         />
+      </div>
+
+      {/* Pay Now clicks */}
+      <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-medium text-gray-700">Pay Now button</h2>
+            <p className="text-xs text-gray-400">
+              Taps on the payment page&apos;s Pay Now / Place Order button
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-semibold text-gray-900">
+              {nf.format(payClicks?.total ?? 0)}
+            </div>
+            <div className="text-xs text-gray-400">
+              total · {nf.format(payClicks?.today ?? 0)} today
+            </div>
+          </div>
+        </div>
+
+        {(payClicks?.by_method.length ?? 0) > 0 ? (
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {payClicks!.by_method.map((m) => {
+              const pct = payClicks!.total
+                ? Math.round((m.clicks / payClicks!.total) * 100)
+                : 0;
+              return (
+                <div
+                  key={m.method}
+                  className="rounded-xl border border-gray-100 bg-gray-50 p-3"
+                >
+                  <div className="text-xs text-gray-500">
+                    {METHOD_LABELS[m.method] ?? m.method}
+                  </div>
+                  <div className="mt-1 text-lg font-semibold text-gray-900">
+                    {nf.format(m.clicks)}
+                    <span className="ml-1 text-xs font-normal text-gray-400">
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {formatPrice(m.amount)} attempted
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-gray-400">
+            No Pay Now taps recorded yet.
+          </p>
+        )}
+
+        {(payClicks?.recent.length ?? 0) > 0 && (
+          <div className="mt-3 border-t border-gray-50 pt-3">
+            <ul className="space-y-1.5 text-xs">
+              {payClicks!.recent.slice(0, 5).map((r, i) => (
+                <li key={i} className="flex items-center gap-3">
+                  <span className="w-14 shrink-0 text-gray-400">
+                    {istTime.format(new Date(r.created_at))}
+                  </span>
+                  <span className="font-medium text-gray-700">
+                    {METHOD_LABELS[r.method] ?? r.method}
+                  </span>
+                  <span className="ml-auto shrink-0 text-gray-500">
+                    {formatPrice(r.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Visits over time */}
