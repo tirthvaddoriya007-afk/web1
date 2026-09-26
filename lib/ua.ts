@@ -31,14 +31,22 @@ export function classifyUserAgent(ua: string): { client: string; device: string 
   }
 
   if (!client) {
-    if (s.includes("edg/") || s.includes("edge/")) client = "Edge";
+    // Generic Android webview (any Play Store app that embeds a browser).
+    // Checked BEFORE Chrome: webview UAs also contain "Chrome/", so ordering
+    // matters. The "; wv)" token appears only in webview platform strings.
+    if (/;\s*wv\)/i.test(s)) client = "In-app browser (Android)";
+    else if (s.includes("edg/") || s.includes("edge/")) client = "Edge";
     else if (s.includes("crios/")) client = "Chrome";
+    // Samsung Internet's UA contains "Chrome/", so it must come first.
+    else if (s.includes("samsungbrowser")) client = "Samsung Internet";
     else if (s.includes("chrome/")) client = "Chrome";
     else if (s.includes("safari/")) client = "Safari";
     else if (s.includes("firefox/")) client = "Firefox";
     else if (s.includes("opr/") || s.includes("opera")) client = "Opera";
-    else if (s.includes("samsungbrowser")) client = "Samsung Internet";
-    else if (s.includes("wv")) client = "WebView"; // generic Android webview
+    // iOS apps embedding WKWebView send a mobile AppleWebKit UA with no
+    // browser token at all (real Safari always includes "safari/").
+    else if (/applewebkit/i.test(s) && /mobi|ipad|iphone|ipod/i.test(s))
+      client = "In-app browser (iOS)";
     else client = "Other";
   }
 

@@ -37,7 +37,16 @@ export interface AnalyticsStats {
 
 const PIE_COLORS = ["#9f2089", "#570b47", "#c2410c", "#0e7490", "#65a30d", "#7c3aed"];
 
-const WEBVIEWS = new Set(["Facebook", "Instagram", "WhatsApp", "Telegram", "WeChat", "Snapchat"]);
+const WEBVIEWS = new Set([
+  "Facebook",
+  "Instagram",
+  "WhatsApp",
+  "Telegram",
+  "WeChat",
+  "Snapchat",
+  "In-app browser (Android)",
+  "In-app browser (iOS)",
+]);
 
 const istTime = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
