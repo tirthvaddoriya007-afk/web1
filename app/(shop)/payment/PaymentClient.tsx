@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
-import PaymentPendingModal from "@/components/PaymentPendingModal";
+import PaymentPendingModal, { type PaymentPopupState } from "@/components/PaymentPendingModal";
 import { buildUpiLink, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
 import { trackPixel } from "@/lib/pixel";
 import { trackPayClick } from "@/lib/payclick";
@@ -27,71 +27,87 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   const upiReady = upiConfigured(upi);
   const [method, setMethod] = useState<Method>(upiReady ? "phonepe" : "cod");
   const [placing, setPlacing] = useState(false);
-  const [pending, setPending] = useState(false);
-  // True once we've handed off to the UPI app. On return we confirm the order.
+  // "opening" = spinner popup during hand-off; "incomplete" = the "Payment
+  // not completed?" popup shown when the user comes back from the UPI app.
+  const [popup, setPopup] = useState<PaymentPopupState | null>(null);
+  // True once the UPI deep link has been fired; guards the return listeners.
   const handedOff = useRef(false);
-  const confirmedRef = useRef(false);
-  const lastNav = useRef(0);
 
   useEffect(() => {
-    if (ready && !pending && (items.length === 0 || !address)) router.replace("/cart");
-  }, [ready, pending, items.length, address, router]);
+    if (ready && !popup && (items.length === 0 || !address)) router.replace("/cart");
+  }, [ready, popup, items.length, address, router]);
 
   /**
-   * Detect the moment the user comes back from the UPI app. Android WebView
-   * and mobile browsers fire `visibilitychange` -> visible and/or `pageshow`
-   * (with persisted=true) when the UPI app closes and control returns to this
-   * page. We use a short grace period so an instant bounce-back (app not
-   * installed) is NOT treated as a successful payment.
+   * While the "opening" popup is up, watch page visibility to detect the UPI
+   * round-trip:
+   *   • the page goes hidden (user actually left for the payment app) and
+   *     then comes back visible → switch the popup to "Payment not
+   *     completed?" — ANY return does this, no order is placed here.
+   *   • a bfcache `pageshow` restore counts as a real return too.
+   *   • if the page NEVER went hidden within 2s, the deep link failed (app
+   *     not installed / scheme blocked) → close the popup and leave the user
+   *     on the payment page with their method and amount intact.
    */
   useEffect(() => {
-    if (!pending) return;
-    if (confirmedRef.current) return;
+    if (popup !== "opening") return;
 
-    const confirmOrder = () => {
-      confirmedRef.current = true;
-      setPending(false);
-      setPlacing(false);
-      const order = placeOrder(`${method === "cod" ? LABELS.cod : LABELS[method]} · Paid`);
-      if (order) {
-        router.replace(`/summary?order=${order.id}`);
-      } else {
-        // Cart was already empty / missing address — shouldn't happen here.
-        router.replace("/cart");
-      }
+    let leftPage = false;
+
+    const markIncomplete = () => {
+      if (!handedOff.current) return;
+      setPopup("incomplete");
     };
 
-    const cameBack = () => {
-      // Ignore the very first paint / event storms during navigation.
-      if (!handedOff.current || confirmedRef.current) return;
-
-      // We fired a deep link but never left the page (WebView / missing app).
-      // Don't confirm — the popup's failure/retry copy covers this case.
-      if (Date.now() - lastNav.current < 1500) return;
-
-      confirmOrder();
+    const backToPayment = () => {
+      setPopup(null);
+      setPlacing(false);
+      handedOff.current = false;
     };
 
     const onVis = () => {
-      if (document.visibilityState === "visible") cameBack();
+      if (document.visibilityState === "hidden") {
+        leftPage = true;
+      } else if (document.visibilityState === "visible" && leftPage) {
+        markIncomplete();
+      }
     };
     const onPageShow = (e: PageTransitionEvent) => {
-      // A bfcache restore only happens after the page was actually left
-      // (navigated away to the UPI app and came back). Treat that as a real
-      // return — never a bounce. An instant bounce doesn't produce persisted.
       if (!e.persisted) return;
-      if (!handedOff.current || confirmedRef.current) return;
-      if (Date.now() - lastNav.current < 1500) return;
-      confirmOrder();
+      markIncomplete();
     };
 
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pageshow", onPageShow);
+    const timer = window.setTimeout(() => {
+      if (!leftPage && document.visibilityState === "visible") backToPayment();
+    }, 2000);
+
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pageshow", onPageShow);
+      window.clearTimeout(timer);
     };
-  }, [pending, method, placeOrder, router]);
+  }, [popup]);
+
+  /**
+   * Fire the deep link for the currently selected app — the exact same
+   * redirection as before (PhonePe collect screen for gpay/phonepe, Paytm
+   * cash-wallet for paytm). The spinner popup opens on the same tick so the
+   * user sees "Opening payment app..." while the OS switches apps.
+   */
+  const handoff = () => {
+    const appLink = buildUpiLink({ config: upi, app: method as UpiApp, amount: payable });
+
+    handedOff.current = true;
+    setPlacing(true);
+    setPopup("opening");
+
+    try {
+      window.location.assign(appLink);
+    } catch {
+      /* no-op: the 2s fallback returns the user to the payment page */
+    }
+  };
 
   const pay = () => {
     // Every Pay Now click counts as a Purchase event (client's spec).
@@ -109,30 +125,9 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     }
 
     // UPI: store a one-time snapshot of this first order (mirrors the
-    // reference store's Ordered* keys), then hand off to the chosen app with
-    // the amount locked into the intent link. The pending sheet shows while
-    // the user is in the UPI app.
+    // reference store's Ordered* keys), then hand off to the chosen app.
     snapshotFirstOrder();
-
-    // Google Pay and PhonePe both open PhonePe's native collect screen
-    // (`phonepe://native?data=<base64>&id=p2ppayment`); Paytm opens its
-    // cash-wallet transfer screen. The amount is signed into the link, so the
-    // UPI app renders it read-only — the user cannot edit what they pay.
-    const appLink = buildUpiLink({ config: upi, app: method as UpiApp, amount: payable });
-
-    handedOff.current = true;
-    confirmedRef.current = false;
-    lastNav.current = Date.now();
-    setPending(true);
-    setPlacing(true);
-
-    // Always try the chosen app first. If the scheme can't be assigned the
-    // page simply stays put and the popup's failure/retry copy covers it.
-    try {
-      window.location.assign(appLink);
-    } catch {
-      /* no-op: the popup's failure/retry state handles a failed handoff */
-    }
+    handoff();
   };
 
   // Mirrors the reference store: the first order ever placed is snapshotted
@@ -154,11 +149,16 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   };
 
   const tryAgain = () => {
-    setPending(false);
+    // Same selected method and amount — restart the flow: spinner popup +
+    // hand off to the same payment app again.
+    handoff();
+  };
+
+  const cancel = () => {
+    // Stay on the payment page — selected method and amount are untouched.
+    setPopup(null);
     setPlacing(false);
     handedOff.current = false;
-    confirmedRef.current = false;
-    lastNav.current = 0;
   };
 
   return (
@@ -274,7 +274,12 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
         </button>
       </div>
 
-      <PaymentPendingModal open={pending} onTryAgain={tryAgain} />
+      <PaymentPendingModal
+        open={popup !== null}
+        state={popup ?? "opening"}
+        onTryAgain={tryAgain}
+        onCancel={cancel}
+      />
     </div>
   );
 }

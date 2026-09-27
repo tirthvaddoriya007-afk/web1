@@ -1,109 +1,84 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
-/** Total countdown window. */
-const TOTAL_SECONDS = 5 * 60;
-
-const R = 52;
-const C = 2 * Math.PI * R;
+export type PaymentPopupState = "opening" | "incomplete";
 
 /**
- * Payment-progress popup shown while the customer is handed off to a UPI app.
+ * Payment hand-off popup — replaces the old countdown/failure sheet.
  *
- * Mirrors the reference store exactly:
- *   • a 5-minute countdown ring;
- *   • at a RANDOM second between 5 and 10, shows "⚠️ Payment Failed. Try
- *     Again" + the refund note and a close button (this is a timer effect,
- *     not a real payment result — the UPI app never reports back);
- *   • at 0:00, shows "⏰ Session Expired. Please try again." and a close
- *     button.
+ * Two states, styled like the reference "Payment not completed?" card
+ * (white rounded card, dimmed backdrop, brand purple #9f2089 primary):
+ *   • "opening"    — fast circular spinner with two lines: "Opening payment
+ *                    app..." and the "please wait" line below it. Shown the
+ *                    instant Pay Now fires the UPI deep link.
+ *   • "incomplete" — "Payment not completed?" sheet with Try Again (re-fires
+ *                    the hand-off to the same app) and Cancel (back to the
+ *                    payment page).
  */
 export default function PaymentPendingModal({
   open,
+  state,
   onTryAgain,
+  onCancel,
 }: {
   open: boolean;
+  state: PaymentPopupState;
   onTryAgain: () => void;
+  onCancel: () => void;
 }) {
-  const [elapsed, setElapsed] = useState(0);
-  const startedAt = useRef<number>(0);
-  const failureSecond = useRef<number>(0);
-
-  // Pick the random failure second (5–10) once per open, like the reference.
-  useEffect(() => {
-    if (!open) return;
-    failureSecond.current = Math.floor(Math.random() * 6) + 5; // 5 to 10
-    startedAt.current = Date.now();
-    setElapsed(0);
-    const id = window.setInterval(() => {
-      const secs = Math.floor((Date.now() - startedAt.current) / 1000);
-      setElapsed(Math.min(secs, TOTAL_SECONDS));
-    }, 250);
-    return () => window.clearInterval(id);
-  }, [open]);
-
   if (!open) return null;
-
-  const remaining = Math.max(0, TOTAL_SECONDS - elapsed);
-  const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
-  const ss = String(remaining % 60).padStart(2, "0");
-
-  const failed = elapsed >= failureSecond.current;
-  const expired = elapsed >= TOTAL_SECONDS;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/45 grid place-items-center px-6">
       <div className="bg-white rounded-2xl w-full max-w-[330px] px-6 py-8 text-center shadow-[0_10px_40px_rgba(0,0,0,0.25)]">
-        {/* Countdown ring — keeps spinning even after the timer hits 00:00 */}
-        <div className="relative mx-auto w-[124px] h-[124px]">
-          <svg viewBox="0 0 124 124" className="w-full h-full pay-spin">
-            <circle cx="62" cy="62" r={R} fill="none" stroke="#eceff5" strokeWidth="8" />
-            <circle
-              cx="62"
-              cy="62"
-              r={R}
-              fill="none"
-              stroke="#3b7ff0"
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={`${C * 0.25} ${C}`}
-            />
-          </svg>
-          <span className="absolute inset-0 grid place-items-center text-[20px] font-semibold text-[#1a2024] tabular-nums">
-            {mm}:{ss}
-          </span>
-        </div>
-
-        {expired ? (
+        {state === "opening" ? (
           <>
-            <p className="mt-5 text-[15px] font-semibold text-[#1a2024]">
-              ⏰ Session Expired. Please try again.
+            {/* Fast circular loader in brand purple. */}
+            <svg viewBox="0 0 76 76" className="mx-auto w-[76px] h-[76px] pay-spin">
+              <circle cx="38" cy="38" r="32" fill="none" stroke="#f3e6f1" strokeWidth="7" />
+              <circle
+                cx="38"
+                cy="38"
+                r="32"
+                fill="none"
+                stroke="var(--brand)"
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray="72 140"
+              />
+            </svg>
+            <p className="mt-6 text-[16px] font-semibold text-[#1a2024]">
+              Opening payment app...
             </p>
-            <button
-              onClick={onTryAgain}
-              className="mt-5 px-7 py-2.5 rounded-lg bg-[#3b7ff0] text-white text-[15px] font-semibold"
-            >
-              Close
-            </button>
+            <p className="mt-2 text-[13px] leading-snug text-[#6b6b78]">
+              Please wait while we are opening your selected payment app
+            </p>
           </>
-        ) : failed ? (
+        ) : (
           <>
-            <p className="mt-5 text-[15px] font-semibold text-[#1a2024]">
-              ⚠️ Payment Failed. Try Again
+            {/* Soft pink circle with a dark pink exclamation mark. */}
+            <div className="mx-auto w-[64px] h-[64px] rounded-full bg-[#fdecec] grid place-items-center">
+              <span className="text-[30px] leading-none font-bold text-[#d9376e]">!</span>
+            </div>
+            <p className="mt-6 text-[17px] font-semibold text-[#1a2024]">
+              Payment not completed?
             </p>
-            <p className="mt-2 text-[13px] leading-snug text-[#e11900]">
-              💡 If the amount has been deducted, it will be refunded within 24 hours.
+            <p className="mt-2 text-[13px] leading-snug text-[#6b6b78]">
+              You can safely open the same payment app again and try once more.
             </p>
             <button
               onClick={onTryAgain}
-              className="mt-5 px-7 py-2.5 rounded-lg bg-[#3b7ff0] text-white text-[15px] font-semibold"
+              className="mt-6 w-full py-3 rounded-lg text-white text-[15px] font-semibold"
+              style={{ background: "var(--brand)" }}
             >
               Try Again
             </button>
+            <button
+              onClick={onCancel}
+              className="mt-3 w-full py-3 rounded-lg bg-white text-[#1a2024] text-[15px] font-semibold border border-[#c4c4cf]"
+            >
+              Cancel
+            </button>
           </>
-        ) : (
-          <p className="mt-5 text-[15px] text-[#4a4a55]">Processing Payment...</p>
         )}
       </div>
     </div>
