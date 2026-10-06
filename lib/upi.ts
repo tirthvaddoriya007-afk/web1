@@ -1,18 +1,15 @@
 // =============================================================================
-// UPI PAYMENT LINKS — merged payment hand-off.
-//
-//   • Google Pay → the PaymentRequest API (`https://tez.google.com/pay`,
-//     handled in PaymentClient); the `tez://upi/pay` fallback link is built here.
-//   • PhonePe    → `phonepe://pay`  (documented UPI intent)
-//   • Paytm      → `paytmmp://pay`  (documented UPI intent)
-//   • iOS        → PaymentRequest is unavailable, so the GPay button routes
-//     through Paytm's wallet link (with the reference's signature).
-//
-// Every intent uses the documented UPI parameters:
-//   pa (payee VPA), pn (payee name), am (amount), tr (reference),
-//   mc (merchant code), cu (currency), tn (note).
+// UPI PAYMENT CONFIG
 //
 // The live values come from the `settings` row in Supabase, edited at /admin.
+// The constants below are only the fallback used before that row is filled in.
+//
+// The deep links mirror the reference store's payment hand-off:
+//   • Google Pay and PhonePe open PhonePe's native collect screen
+//     (`phonepe://native?data=<base64>&id=p2ppayment`) with a base64 JSON
+//     checkout payload built by generateUpiPayload().
+//   • Paytm opens its cash-wallet transfer screen
+//     (`paytmmp://cash_wallet?pa=…&pn=…&am=…&cu=INR&tn=…&featuretype=money_transfer`).
 // =============================================================================
 
 export interface UpiConfig {
@@ -20,7 +17,7 @@ export interface UpiConfig {
   vpa: string;
   /** Payee name shown inside the UPI app. Keep it short. */
   payeeName: string;
-  /** Optional merchant code (MCC). Empty falls back to the reference's 8999. */
+  /** Optional merchant code (MCC). Empty for a personal UPI ID. */
   merchantCode: string;
 }
 
@@ -34,10 +31,10 @@ export type UpiApp = "gpay" | "phonepe" | "paytm";
 
 /**
  * True on iPhone/iPad (including iPads that report as Mac desktops) — the
- * reference store's detection. Used to route the GPay button around
- * PaymentRequest on iOS.
+ * reference store's detection. PhonePe's `phonepe://native?...&id=p2ppayment`
+ * collect route only exists in the Android app, so iOS needs a different link.
  */
-export function isIOS(): boolean {
+function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   return (
     /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
@@ -46,18 +43,52 @@ export function isIOS(): boolean {
 }
 
 /**
- * Paytm wallet signature the reference appends on iOS. Kept verbatim so the
- * iOS GPay link is byte-for-byte the reference's link.
+ * Base64 JSON payload for PhonePe's native P2P collect screen
+ * (`phonepe://native?data=<this>&id=p2ppayment`).
+ *
+ * Mirrors the reference site's generateUpiPayload(): the note is a unique
+ * `Orderid-<6 digits>`, the amount is locked (allowAmountEdit /
+ * disableNotesEdit / disableViewHistory), the contact is an external merchant,
+ * and the amount is expressed in paise (`initialAmount: Math.round(amount * 100)`).
  */
-const PAYTM_WALLET_SIGN =
-  "AAuN7izDWN5cb8A5scnUiNME+LkZqI2DWgkXlN1McoP6WZABa/KkFTiLvuPRP6/nWK8BPg/rPhb+u4QMrUEX10UsANTDbJaALcSM9b8Wk218X+55T/zOzb7xoiB+BcX8yYuYayELImXJHIgL/c7nkAnHrwUCmbM97nRbCVVRvU0ku3Tr";
+export function generateUpiPayload(vpa: string, payeeName: string, amount: number): string {
+  const orderId = Math.floor(100000 + Math.random() * 900000);
+  const data = {
+    p2pPaymentCheckoutParams: {
+      isByDefaultKnownContact: true,
+      enableSpeechToText: false,
+      allowAmountEdit: false,
+      showQrCodeOption: false,
+      disableViewHistory: true,
+      shouldShowUnsavedContactBanner: false,
+      isRecurring: false,
+      checkoutType: "COLLECT",
+      transactionContext: "p2p",
+      initialAmount: Math.round(amount * 100), // paise
+      disableNotesEdit: true,
+      currency: "INR",
+      shouldShowMaskedNumber: true,
+      note: {
+        type: "text",
+        message: `Orderid-${orderId}`,
+      },
+      supportedInstruments: -1,
+    },
+    contact: {
+      type: "EXTERNAL_MERCHANT",
+      name: payeeName,
+      vpa,
+    },
+  };
+  // Kept raw (not URL-encoded) exactly like the reference flow — the UPI app
+  // expects the plain base64 string in the `data` parameter.
+  return btoa(JSON.stringify(data));
+}
 
 /**
- * Build the deep link that hands the customer off to the chosen UPI app —
- * the same link strings the reference store builds:
- *   • gpay    → `tez://upi/pay` (Android fallback) / Paytm wallet link (iOS)
- *   • phonepe → `phonepe://pay`
- *   • paytm   → `paytmmp://pay`
+ * Build the deep link that hands the customer off to the chosen UPI app:
+ *   • gpay / phonepe → PhonePe's native collect screen (base64 payload above)
+ *   • paytm          → Paytm cash-wallet transfer with the amount read-only
  */
 export function buildUpiLink(opts: {
   config: UpiConfig;
@@ -67,49 +98,33 @@ export function buildUpiLink(opts: {
   const { config, app, amount } = opts;
   const vpa = config.vpa.trim();
   const payeeName = config.payeeName.trim() || "Merchant";
-  const am = amount.toFixed(2);
-  const mc = config.merchantCode.trim() || "8999";
 
-  if (app === "gpay") {
-    if (isIOS()) {
-      // Reference flow: on iOS the GPay button opens Paytm's wallet link.
-      const txnId = Math.floor(Math.random() * 10000000000);
-      return (
-        `paytmmp://cash_wallet?pa=${vpa}` +
-        `&pn=${encodeURIComponent(payeeName)}` +
-        `&am=${am}` +
-        `&tr=&mc=8999&cu=INR` +
-        `&tn=${txnId}` +
-        `&sign=${PAYTM_WALLET_SIGN}`
-      );
-    }
+  // iOS only: the reference store routes every UPI button through PhonePe's
+  // pay screen — the `phonepe:upi://pay` intent is the one the iPhone app
+  // understands. Android keeps the app-specific links below, untouched.
+  if (isIOS()) {
     return (
-      `tez://upi/pay?pa=${vpa}` +
+      `phonepe:upi://pay?pa=${encodeURIComponent(vpa)}` +
       `&pn=${encodeURIComponent(payeeName)}` +
-      `&am=${am}` +
-      `&mc=${mc}&cu=INR` +
+      `&am=${amount.toFixed(2)}` +
+      `&cu=INR` +
       `&tn=${encodeURIComponent(payeeName)}`
     );
   }
 
-  if (app === "phonepe") {
+  if (app === "paytm") {
+    const amt = amount.toFixed(2);
     return (
-      `phonepe://pay?pa=${vpa}` +
+      `paytmmp://cash_wallet?pa=${vpa}` +
       `&pn=${encodeURIComponent(payeeName)}` +
-      `&am=${am}` +
-      `&tr=&mc=${mc}&cu=INR` +
-      `&tn=${encodeURIComponent(payeeName)}`
+      `&am=${amt}&cu=INR` +
+      `&tn=${encodeURIComponent(payeeName)}` +
+      `&featuretype=money_transfer`
     );
   }
 
-  // paytm — the documented UPI pay intent, not the wallet-transfer screen.
-  return (
-    `paytmmp://pay?pa=${vpa}` +
-    `&pn=${encodeURIComponent(payeeName)}` +
-    `&am=${am}` +
-    `&tr=&mc=${mc}&cu=INR` +
-    `&tn=${encodeURIComponent(payeeName)}`
-  );
+  // Google Pay and PhonePe both open PhonePe's collect screen (reference flow).
+  return `phonepe://native?data=${generateUpiPayload(vpa, payeeName, amount)}&id=p2ppayment`;
 }
 
 /** True when a UPI ID is actually configured (has a VPA with an @). */
