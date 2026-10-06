@@ -14,7 +14,7 @@ function SummaryInner() {
   const order = orders.find((o) => o.id === orderId) || orders[0];
 
   useEffect(() => {
-    if (ready && !order) router.replace("/");
+    if (ready && !order) router.replace("/home");
   }, [ready, order, router]);
 
   if (!order) return null;
@@ -85,7 +85,7 @@ function SummaryInner() {
         <Link href="/order" className="btn-outline no-underline text-center">
           Track Order
         </Link>
-        <Link href="/" className="btn-brand no-underline text-center">
+        <Link href="/home" className="btn-brand no-underline text-center">
           Continue Shopping
         </Link>
       </div>

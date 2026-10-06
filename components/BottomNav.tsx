@@ -9,7 +9,7 @@ import { NAV_ICONS } from "./navIcons";
 const HIDE_PREFIXES = ["/product", "/cart", "/address", "/payment", "/summary"];
 
 const ITEMS = [
-  { href: "/", key: "home", label: "Home", match: (p: string) => p === "/" },
+  { href: "/home", key: "home", label: "Home", match: (p: string) => p === "/home" },
   { href: "/category", key: "categories", label: "Categories", match: (p: string) => p.startsWith("/category") },
   { href: "/order", key: "orders", label: "My Orders", match: (p: string) => p.startsWith("/order") },
   { href: "/help", key: "help", label: "Help", match: (p: string) => p.startsWith("/help") },

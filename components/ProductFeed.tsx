@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Product } from "@/lib/types";
 import ProductCard from "./ProductCard";
 import ProductCardOffer from "./ProductCardOffer";
+import { ProductGridSkeleton } from "./StoreSkeleton";
 
 /**
  * The first page is rendered on the server and handed in, so the grid is
@@ -64,14 +65,7 @@ export default function ProductFeed({
         )}
       </div>
       <div ref={sentinel} />
-      {loading && (
-        <div className="flex justify-center py-8">
-          <div
-            className="w-9 h-9 rounded-full animate-spin"
-            style={{ border: "6px solid #f3f3f3", borderTopColor: "var(--brand)" }}
-          />
-        </div>
-      )}
+      {loading && <ProductGridSkeleton count={4} />}
     </div>
   );
 }

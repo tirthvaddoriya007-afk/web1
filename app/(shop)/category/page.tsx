@@ -1,17 +1,23 @@
 import Link from "next/link";
-import { categories, getProductsByCategory } from "@/lib/data";
+import { getCategories, getCategorySamples } from "@/lib/catalog";
 import SearchBar from "@/components/SearchBar";
 
 export const metadata = { title: "Categories" };
 
-export default function CategoriesPage() {
+// Live catalogue — served through the 10s SWR cache; admin edits go live
+// instantly via /api/revalidate, with no cache or rebuild.
+export const dynamic = "force-dynamic";
+
+export default async function CategoriesPage() {
+  const [cats, samples] = await Promise.all([getCategories(), getCategorySamples()]);
+
   return (
     <div>
       <SearchBar />
       <h2 className="px-4 pt-4 pb-2 font-bold text-lg">Shop by Category</h2>
       <div className="grid grid-cols-3 gap-2 p-3">
-        {categories.map((c) => {
-          const sample = getProductsByCategory(c.name)[0];
+        {cats.map((c) => {
+          const sample = samples.find((p) => p.categories.includes(c.name));
           return (
             <Link
               key={c.slug}

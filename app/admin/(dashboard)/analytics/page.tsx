@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { ANALYTICS_RANGES, type AnalyticsRange } from "@/lib/analytics";
 import AnalyticsDashboard, {
   type AnalyticsStats,
   type PayClickStats,
+  type WelcomeClickStats,
 } from "@/components/admin/AnalyticsDashboard";
 
 export const dynamic = "force-dynamic";
@@ -10,22 +12,26 @@ export const fetchCache = "force-no-store";
 export default async function AdminAnalyticsPage({
   searchParams,
 }: {
-  searchParams: { days?: string };
+  searchParams: { range?: string };
 }) {
-  const requested = Number.parseInt(searchParams.days ?? "7", 10);
-  const days = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 90) : 7;
+  const requested = searchParams.range ?? "7d";
+  const range: AnalyticsRange = ANALYTICS_RANGES.some((r) => r.key === requested)
+    ? (requested as AnalyticsRange)
+    : "7d";
 
   const supabase = createClient();
-  const [views, clicks] = await Promise.all([
-    supabase.rpc("page_views_stats", { days }),
+  const [views, clicks, welcomeClicks] = await Promise.all([
+    supabase.rpc("page_views_stats", { p_window: range }),
     supabase.rpc("pay_clicks_stats"),
+    supabase.rpc("welcome_clicks_stats"),
   ]);
 
   return (
     <AnalyticsDashboard
       stats={(views.data as AnalyticsStats) ?? null}
       payClicks={(clicks.data as PayClickStats) ?? null}
-      days={days}
+      welcomeClicks={(welcomeClicks.data as WelcomeClickStats) ?? null}
+      range={range}
     />
   );
 }

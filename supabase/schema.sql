@@ -42,12 +42,17 @@ create table if not exists public.settings (
   upi_payee_name text not null default '',
   upi_merchant_code text not null default '',
   meta_pixel_id  text not null default '',
+  welcome_redirect_seconds int not null default 1,
   updated_at     timestamptz not null default now()
 );
 
 -- Existing databases (created before meta_pixel_id) get the column added here.
 -- Idempotent, so it is safe to run on a fresh database too.
 alter table public.settings add column if not exists meta_pixel_id text not null default '';
+
+-- Welcome landing auto-redirect timer (seconds; 0 disables the timer).
+-- Idempotent for databases created before the column existed.
+alter table public.settings add column if not exists welcome_redirect_seconds int not null default 1;
 
 -- Seed the single row so the admin screen always has something to update.
 insert into public.settings (id) values (1) on conflict (id) do nothing;
@@ -258,5 +263,56 @@ as $$
     'recent', (select coalesce(jsonb_agg(jsonb_build_object(
                'method', method, 'amount', amount, 'created_at', created_at)),
                '[]'::jsonb) from recent)
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 6. WELCOME TAPS — one row every time a visitor taps anywhere on the welcome
+--    landing (each tap sends them to /home). Written by /api/welcome-click.
+--    Lets the admin see how many visitors actually tap through, separately
+--    from the auto-redirect timer.
+-- ---------------------------------------------------------------------------
+create table if not exists public.welcome_clicks (
+  id         bigint generated always as identity primary key,
+  visitor_id uuid not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists welcome_clicks_created_at_idx
+  on public.welcome_clicks (created_at desc);
+
+-- RLS: anyone on the storefront may record a tap; only admins may read.
+alter table public.welcome_clicks enable row level security;
+
+drop policy if exists welcome_clicks_insert on public.welcome_clicks;
+create policy welcome_clicks_insert on public.welcome_clicks
+  for insert to anon, authenticated with check (true);
+
+drop policy if exists welcome_clicks_select on public.welcome_clicks;
+create policy welcome_clicks_select on public.welcome_clicks
+  for select using (public.is_admin());
+
+-- One call returns everything the dashboard card needs for the welcome page:
+-- total taps, today's taps and the most recent taps.
+create or replace function public.welcome_clicks_stats()
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  with today_rows as (
+    select * from public.welcome_clicks
+    where created_at >= (date_trunc('day', now() at time zone 'Asia/Kolkata')
+                         at time zone 'Asia/Kolkata')
+  ),
+  recent as (
+    select created_at
+    from public.welcome_clicks order by created_at desc limit 10
+  )
+  select jsonb_build_object(
+    'total', (select count(*) from public.welcome_clicks),
+    'today', (select count(*) from today_rows),
+    'recent', (select coalesce(jsonb_agg(jsonb_build_object(
+               'created_at', created_at)), '[]'::jsonb) from recent)
   );
 $$;

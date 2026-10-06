@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
 import PaymentPendingModal, { type PaymentPopupState } from "@/components/PaymentPendingModal";
-import { buildUpiLink, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
+import { buildUpiLink, isIOS, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
 import { trackPixel } from "@/lib/pixel";
 import { trackPayClick } from "@/lib/payclick";
 
@@ -90,10 +90,10 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   }, [popup]);
 
   /**
-   * Fire the deep link for the currently selected app — the exact same
-   * redirection as before (PhonePe collect screen for gpay/phonepe, Paytm
-   * cash-wallet for paytm). The spinner popup opens on the same tick so the
-   * user sees "Opening payment app..." while the OS switches apps.
+   * Fire the deep link for the selected app — the reference's documented
+   * UPI intents (`phonepe://pay` / `paytmmp://pay`). The spinner popup opens
+   * on the same tick so the user sees "Opening payment app..." while the OS
+   * switches apps.
    */
   const handoff = () => {
     const appLink = buildUpiLink({ config: upi, app: method as UpiApp, amount: payable });
@@ -107,6 +107,97 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     } catch {
       /* no-op: the 2s fallback returns the user to the payment page */
     }
+  };
+
+  /**
+   * Deep-link fallback for the GPay button — `tez://upi/pay` on Android and
+   * the reference's Paytm wallet link on iOS (built in buildUpiLink).
+   */
+  const gpayFallback = () => {
+    window.location.href = buildUpiLink({ config: upi, app: "gpay", amount: payable });
+  };
+
+  /**
+   * Google Pay — the reference's PaymentRequest flow:
+   *   • iOS / no PaymentRequest support → straight to the deep-link fallback.
+   *   • canMakePayment() false → alert the user, then fall back.
+   *   • the sheet resolves → the user completed the payment, so place the
+   *     order and land on the summary page. (The reference calls a
+   *     processResponse() that doesn't exist in its codebase — a dead end
+   *     we deliberately do not clone.)
+   */
+  const payWithGpay = () => {
+    if (isIOS()) {
+      gpayFallback();
+      return;
+    }
+
+    if (!("PaymentRequest" in window)) {
+      alert("Web payments are not supported in this browser. Redirecting to alternative payment methods.");
+      gpayFallback();
+      return;
+    }
+
+    const vpa = upi.vpa.trim();
+    const payeeName = upi.payeeName.trim() || "Merchant";
+    const txnId = Math.floor(Math.random() * 10000000000);
+
+    const supportedInstruments: PaymentMethodData[] = [
+      {
+        supportedMethods: "https://tez.google.com/pay",
+        data: {
+          pa: vpa,
+          pn: payeeName,
+          tr: String(txnId),
+          url: `${window.location.origin}/order/${txnId}`,
+          mc: "0000",
+          tn: `${payeeName}_${txnId}`,
+        },
+      },
+    ];
+
+    const details = {
+      total: {
+        label: "Total",
+        amount: { currency: "INR", value: payable.toFixed(2) },
+      },
+      displayItems: [
+        {
+          label: "Original Amount",
+          amount: { currency: "INR", value: payable.toFixed(2) },
+        },
+      ],
+    };
+
+    let request: PaymentRequest;
+    try {
+      request = new PaymentRequest(supportedInstruments, details);
+    } catch (err) {
+      alert(`Payment Request Error: ${err instanceof Error ? err.message : err}. Please check your payment details.`);
+      gpayFallback();
+      return;
+    }
+
+    setPlacing(true);
+    request
+      .canMakePayment()
+      .then((ok) => {
+        if (ok) return request.show();
+        alert("Google Pay is not available right now. Please go ahead with Paytm!");
+        throw new Error("gpay-unavailable");
+      })
+      .then(() => {
+        const order = placeOrder(LABELS.gpay);
+        router.replace(order ? `/summary?order=${order.id}` : "/cart");
+      })
+      .catch((err: unknown) => {
+        setPlacing(false);
+        if (err instanceof Error && err.message === "gpay-unavailable") {
+          gpayFallback();
+          return;
+        }
+        alert(`Payment Request Error: ${err instanceof Error ? err.message : err}. Please check your payment details.`);
+      });
   };
 
   const pay = () => {
@@ -127,6 +218,12 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     // UPI: store a one-time snapshot of this first order (mirrors the
     // reference store's Ordered* keys), then hand off to the chosen app.
     snapshotFirstOrder();
+
+    if (method === "gpay") {
+      payWithGpay();
+      return;
+    }
+
     handoff();
   };
 

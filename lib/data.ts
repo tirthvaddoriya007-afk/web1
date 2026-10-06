@@ -1,35 +1,10 @@
-import productsData from "@/data/products.json";
-import categoriesData from "@/data/categories.json";
-import type { Product, Category } from "./types";
+// Pure, client-safe helpers + shared constants. No Supabase, no JSON imports —
+// these are bundled into client components (cards, cart) as well as the server.
+// Product/review/home-content data access now lives in lib/catalog.ts (async,
+// Supabase-backed, never cached) so admin edits appear instantly everywhere.
+import { PAGE_SIZE } from "./paging";
 
-export const products = productsData as Product[];
-export const categories = categoriesData as Category[];
-
-export function getProduct(hash: string): Product | undefined {
-  return products.find((p) => p.hash === hash);
-}
-
-// Feed paging. Shared by the API route and the server-rendered first page, so
-// the two can never disagree about page size.
-export const PAGE_SIZE = 30;
-
-export function getProductPage(page: number): { products: Product[]; page: number; total_page: number } {
-  const p = Math.max(1, page);
-  const start = (p - 1) * PAGE_SIZE;
-  return {
-    products: products.slice(start, start + PAGE_SIZE),
-    page: p,
-    total_page: Math.ceil(products.length / PAGE_SIZE),
-  };
-}
-
-export function getCategoryBySlug(slug: string): Category | undefined {
-  return categories.find((c) => c.slug === slug || c.origSlug === slug);
-}
-
-export function getProductsByCategory(name: string): Product[] {
-  return products.filter((p) => p.categories.includes(name));
-}
+export { PAGE_SIZE };
 
 // Deterministic pseudo-random from a string seed (stable across renders/SSR).
 export function seededRandom(seed: string): () => number {

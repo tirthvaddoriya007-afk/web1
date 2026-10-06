@@ -6,10 +6,25 @@ import type { Product } from "@/lib/types";
 import { formatPrice, seededRandom } from "@/lib/data";
 import { useCountdown, fmtCountdown } from "@/lib/countdown";
 import TimerIcon from "./TimerIcon";
+import TrustedLogo from "./TrustedLogo";
+
+/**
+ * Self-contained countdown pill. Subscribes to the shared countdown context on
+ * its own, so only this tiny node re-renders every second — the rest of the
+ * card (image, prices, ratings) stays untouched while the timer ticks.
+ */
+function CardCountdown() {
+  const t = useCountdown();
+  return (
+    <div className="pc-timer">
+      <TimerIcon size={16} />
+      <span>{fmtCountdown(t)}</span>
+    </div>
+  );
+}
 
 export default function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const router = useRouter();
-  const t = useCountdown();
 
   // Stable per-product rating + count (seeded so it never changes on re-render).
   const rnd = seededRandom(product.hash);
@@ -51,10 +66,7 @@ export default function ProductCard({ product, priority = false }: { product: Pr
       </Link>
 
       {/* Countdown pill (shared timer) */}
-      <div className="pc-timer">
-        <TimerIcon size={16} />
-        <span>{fmtCountdown(t)}</span>
-      </div>
+      <CardCountdown />
 
       {/* Buy Now */}
       <button className="pc-buy" onClick={buyNow}>
@@ -75,14 +87,7 @@ export default function ProductCard({ product, priority = false }: { product: Pr
         </span>
         <span className="pc-count">({count})</span>
         <span className="pc-trusted">
-          <svg width="13" height="15" viewBox="0 0 17 20" fill="none" aria-hidden>
-            <path
-              d="M8.5 1L1 3.5v6C1 14.5 4.4 17.5 8.5 19c4.1-1.5 7.5-4.5 7.5-9.5v-6L8.5 1z"
-              fill="#60014A"
-            />
-            <path d="M5.3 9.8l2.3 2.2 4-4.4" stroke="#FF9D00" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Trusted
+          <TrustedLogo />
         </span>
       </div>
     </div>

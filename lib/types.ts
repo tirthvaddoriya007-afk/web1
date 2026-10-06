@@ -6,16 +6,19 @@ export interface Product {
   mrp: number;
   off: string;
   image: string;
+  images: string[];
   badge: string;
   categories: string[];
   category: string;
+  order_number?: number;
 }
 
 export interface Category {
+  id?: number;
   slug: string;
   origSlug: string;
   name: string;
-  count: number;
+  count?: number;
 }
 
 export interface CartItem {
@@ -45,4 +48,24 @@ export interface Order {
   paymentMode: string;
   status: string;
   placedAt: string;
+}
+
+export interface Review {
+  id: number;
+  name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
+export interface HomeContent {
+  banner1_url: string;
+  banner1_link: string;
+  banner1_alt: string;
+  banner2_url: string;
+  banner2_link: string;
+  banner2_alt: string;
+  promo_text: string;
+  /** Seconds the welcome landing stays before auto-redirect to /home; 0 disables. */
+  welcome_redirect_seconds: number;
 }

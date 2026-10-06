@@ -103,13 +103,13 @@ export default function Header() {
             </span>
           )}
           {showBack && (
-            <Link href="/" aria-label="Back to home" className="flex items-center pr-1 -ml-1">
+            <Link href="/home" aria-label="Back to home" className="flex items-center pr-1 -ml-1">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 5l-7 7 7 7" />
               </svg>
             </Link>
           )}
-          <Link href="/" className="flex items-center gap-2 no-underline">
+          <Link href="/home" className="flex items-center gap-2 no-underline">
             {brand.logoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={brand.logoSrc} alt={brand.name} className="h-6 w-auto" fetchPriority="high" decoding="async" />

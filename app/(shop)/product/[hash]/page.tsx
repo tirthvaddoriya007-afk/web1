@@ -1,23 +1,21 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  getProduct,
-  products,
-  getProductsByCategory,
-  formatPrice,
-  specialOffer,
-  seededRandom,
-} from "@/lib/data";
+import { formatPrice, specialOffer, seededRandom } from "@/lib/data";
+import { getProductByHash, getForYouProducts, getReviews } from "@/lib/catalog";
 import { buildRatings } from "@/lib/reviews";
+import type { Review as DbReview } from "@/lib/types";
 import AddToCartBar from "@/components/AddToCartBar";
 import ProductCardOffer from "@/components/ProductCardOffer";
+import ProductImageSlider from "@/components/ProductImageSlider";
+import TrustedLogo from "@/components/TrustedLogo";
 
-export function generateStaticParams() {
-  return products.map((p) => ({ hash: p.hash }));
-}
+// Live product data — served through the 10s SWR cache, so admin edits (price,
+// images, position) are visible instantly via /api/revalidate while shoppers
+// never wait on the database.
+export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }: { params: { hash: string } }) {
-  const p = getProduct(params.hash);
+export async function generateMetadata({ params }: { params: { hash: string } }) {
+  const p = await getProductByHash(params.hash);
   return { title: p ? p.name : "Product" };
 }
 
@@ -39,18 +37,50 @@ function specRows(name: string) {
   ];
 }
 
-export default function ProductPage({ params }: { params: { hash: string } }) {
-  const product = getProduct(params.hash);
+function formatReviewDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return (
+    "Posted on " +
+    d.toLocaleDateString("en-US", {
+      timeZone: "UTC",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    })
+  );
+}
+
+export default async function ProductPage({ params }: { params: { hash: string } }) {
+  const product = await getProductByHash(params.hash);
   if (!product) notFound();
 
+  const images = (product.images?.length ? product.images : [product.image]).filter(Boolean);
   const ratings = buildRatings(product.hash, product.image);
   const offer = specialOffer(product.hash, product.price);
 
-  const inCat = getProductsByCategory(product.category).filter((p) => p.hash !== product.hash);
-  const similar = inCat.slice(0, 5);
-  const forYou = [...inCat.slice(5), ...products.filter((p) => p.category !== product.category)]
-    .filter((p) => p.hash !== product.hash)
-    .slice(0, 8);
+  const [forYou, sharedReviews] = await Promise.all([
+    getForYouProducts(product.category, product.hash, 8),
+    getReviews(),
+  ]);
+
+  // Shared reviews (same on every product) — each rendered with THIS product's
+  // image. Falls back to the seeded reviews if the reviews table is empty.
+  const reviewCards = (sharedReviews.length > 0 ? sharedReviews : []).map((r: DbReview) => {
+    const helpfulRnd = seededRandom("helpful:" + r.id);
+    return {
+      name: r.name,
+      rating: Number(r.rating).toFixed(1),
+      date: formatReviewDate(r.created_at) || "Posted on October 1, 2025",
+      text: r.comment,
+      helpful: 50 + Math.floor(helpfulRnd() * 850),
+      image: product.image,
+    };
+  });
+  const shownReviews =
+    reviewCards.length > 0
+      ? reviewCards
+      : ratings.reviews.map((r) => ({ ...r, image: product.image }));
 
   // Small independent rating pair for the top row (separate from reviews block).
   const tr = seededRandom("top:" + product.hash);
@@ -60,28 +90,9 @@ export default function ProductPage({ params }: { params: { hash: string } }) {
 
   return (
     <div className="pb-16 bg-[#f4f4f6]">
-      {/* Image + carousel dot */}
+      {/* Image slider (1–3 images, swipeable) */}
       <div className="bg-white px-4 pt-4">
-        <div className="w-full aspect-square bg-[#f7f7f9] rounded-lg overflow-hidden flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={product.image} alt={product.name} className="w-full h-full object-contain" fetchPriority="high" decoding="async" />
-        </div>
-        <div className="flex justify-center py-3">
-          <span className="w-6 h-1 rounded-full" style={{ background: "var(--brand)" }} />
-        </div>
-
-        {/* Similar products */}
-        {similar.length > 0 && (
-          <div className="pb-4">
-            <h4 className="text-[15px] font-bold mb-2">{similar.length} Similar Products</h4>
-            <div className="flex gap-2.5 overflow-x-auto pb-1">
-              <ThumbLink href={`/product/${product.hash}`} src={product.image} active />
-              {similar.map((s) => (
-                <ThumbLink key={s.hash} href={`/product/${s.hash}`} src={s.image} />
-              ))}
-            </div>
-          </div>
-        )}
+        <ProductImageSlider images={images} name={product.name} />
       </div>
 
       {/* Title + price block */}
@@ -138,7 +149,10 @@ export default function ProductPage({ params }: { params: { hash: string } }) {
             {topRatings} ratings and {topReviews} reviews
           </span>
           <span className="w-1 h-1 rounded-full bg-[#c9c9d1]" />
-          <TrustedBadge />
+          {/* Trusted pill — same pink pill as the reference's trusted-badge-mini */}
+          <span className="inline-flex items-center rounded-[12px] bg-[#fff0fc] px-2 py-0.5">
+            <TrustedLogo />
+          </span>
         </div>
 
         <p className="text-[13px] font-bold mt-3">Free Delivery</p>
@@ -197,7 +211,7 @@ export default function ProductPage({ params }: { params: { hash: string } }) {
 
         {/* comments — each card padding 10px 16px, separated by a full-width rule */}
         <div className="mt-2">
-          {ratings.reviews.map((r, i) => (
+          {shownReviews.map((r, i) => (
             <div key={i} className={`px-4 py-2.5 ${i > 0 ? "border-t border-[#eaeaef]" : ""}`}>
               <div className="flex items-center gap-2">
                 <UserAvatar />
@@ -271,29 +285,6 @@ function Action({ label, children }: { label: string; children: React.ReactNode 
       {children}
       <span>{label}</span>
     </div>
-  );
-}
-function TrustedBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#60014a]">
-      <svg width="13" height="15" viewBox="0 0 17 20" fill="none" aria-hidden>
-        <path d="M8.5 1L1 3.5v6C1 14.5 4.4 17.5 8.5 19c4.1-1.5 7.5-4.5 7.5-9.5v-6L8.5 1z" fill="#60014A" />
-        <path d="M5.3 9.8l2.3 2.2 4-4.4" stroke="#FF9D00" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      Trusted
-    </span>
-  );
-}
-function ThumbLink({ href, src, active }: { href: string; src: string; active?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className="shrink-0 w-[70px] h-[70px] rounded-lg p-1.5 bg-white"
-      style={{ border: active ? "1.5px solid var(--brand)" : "1px solid #eee" }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className="w-full h-full object-contain" loading="lazy" decoding="async" />
-    </Link>
   );
 }
 function UserAvatar() {

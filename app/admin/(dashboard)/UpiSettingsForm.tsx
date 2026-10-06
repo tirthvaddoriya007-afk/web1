@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { invalidateAll } from "@/lib/admin/revalidate";
 import { brand } from "@/lib/brand";
 
 export interface UpiSettings {
@@ -61,6 +62,7 @@ export default function UpiSettingsForm({ initial }: { initial: UpiSettings }) {
     }
 
     setStatus("saved");
+    invalidateAll();
     router.refresh();
   }
 

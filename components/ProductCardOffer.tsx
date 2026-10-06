@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { formatPrice, seededRandom, specialOffer } from "@/lib/data";
+import TrustedLogo from "./TrustedLogo";
 
 /**
  * Catalog card in the "offer pill + Free Delivery" style used on category
@@ -72,11 +73,7 @@ export default function ProductCardOffer({ product }: { product: Product }) {
         </span>
         <span className="pc-count">({count})</span>
         <span className="pc-trusted">
-          <svg width="13" height="15" viewBox="0 0 17 20" fill="none" aria-hidden>
-            <path d="M8.5 1L1 3.5v6C1 14.5 4.4 17.5 8.5 19c4.1-1.5 7.5-4.5 7.5-9.5v-6L8.5 1z" fill="#60014A" />
-            <path d="M5.3 9.8l2.3 2.2 4-4.4" stroke="#FF9D00" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Trusted
+          <TrustedLogo />
         </span>
       </div>
     </div>

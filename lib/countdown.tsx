@@ -10,8 +10,11 @@ interface Time {
 
 const Ctx = createContext<Time>({ h: 1, m: 29, s: 56 });
 
-// One global countdown shared by the Daily Deals header and every product card,
-// so they all tick together (matching the reference site's single timer).
+// One global countdown shared by the Daily Deals header and every product
+// card, so they all tick together (matching the reference site's single
+// timer). The timer state updates every second for the UI, but it is only
+// persisted to localStorage every ~5s and when the tab hides — writing three
+// keys per second on every tick was unnecessary churn.
 export function CountdownProvider({ children }: { children: React.ReactNode }) {
   const [t, setT] = useState<Time>({ h: 1, m: 29, s: 56 });
 
@@ -25,6 +28,19 @@ export function CountdownProvider({ children }: { children: React.ReactNode }) {
       s: Number.isNaN(s) ? 56 : s,
     };
     setT(cur);
+
+    const persist = () => {
+      localStorage.setItem("timerHours", String(cur.h));
+      localStorage.setItem("timerMinutes", String(cur.m));
+      localStorage.setItem("timerSeconds", String(cur.s));
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") persist();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    let ticks = 0;
     const id = setInterval(() => {
       if (cur.s > 0) cur = { ...cur, s: cur.s - 1 };
       else if (cur.m > 0) cur = { ...cur, m: cur.m - 1, s: 59 };
@@ -33,12 +49,16 @@ export function CountdownProvider({ children }: { children: React.ReactNode }) {
         // reset for a fresh "deal" cycle
         cur = { h: 1, m: 29, s: 56 };
       }
-      localStorage.setItem("timerHours", String(cur.h));
-      localStorage.setItem("timerMinutes", String(cur.m));
-      localStorage.setItem("timerSeconds", String(cur.s));
+      ticks += 1;
+      if (ticks % 5 === 0) persist();
       setT({ ...cur });
     }, 1000);
-    return () => clearInterval(id);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+      persist();
+    };
   }, []);
 
   return <Ctx.Provider value={t}>{children}</Ctx.Provider>;

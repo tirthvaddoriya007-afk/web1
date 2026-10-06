@@ -323,10 +323,7 @@ body {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #60014a;
+  flex-shrink: 0;
 }
 .product-card {
   display: block;

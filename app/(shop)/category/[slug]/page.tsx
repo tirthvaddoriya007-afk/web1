@@ -1,20 +1,22 @@
 import { notFound } from "next/navigation";
 import ProductCardOffer from "@/components/ProductCardOffer";
-import { categories, getCategoryBySlug, getProductsByCategory } from "@/lib/data";
+import { getCategories, getProductsByCategory } from "@/lib/catalog";
 
-export function generateStaticParams() {
-  return categories.map((c) => ({ slug: c.slug }));
-}
+// Live catalogue — served through the 10s SWR cache; category edits go live
+// instantly via /api/revalidate.
+export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }: { params: { slug: string } }) {
-  const cat = getCategoryBySlug(params.slug);
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  const cats = await getCategories();
+  const cat = cats.find((c) => c.slug === params.slug || c.origSlug === params.slug);
   return { title: cat ? cat.name : "Category" };
 }
 
-export default function CategoryPage({ params }: { params: { slug: string } }) {
-  const cat = getCategoryBySlug(params.slug);
+export default async function CategoryPage({ params }: { params: { slug: string } }) {
+  const cats = await getCategories();
+  const cat = cats.find((c) => c.slug === params.slug || c.origSlug === params.slug);
   if (!cat) notFound();
-  const list = getProductsByCategory(cat.name);
+  const list = await getProductsByCategory(cat.name);
 
   return (
     <div>

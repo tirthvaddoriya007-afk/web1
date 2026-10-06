@@ -16,7 +16,7 @@ export default function CartPage() {
         <CheckoutSteps active={1} />
         <div className="text-center py-24 px-6">
           <p className="text-xl font-semibold text-[#1a2024] mb-2">Your cart is feeling lonely</p>
-          <Link href="/" className="btn-brand inline-block mt-4 no-underline max-w-[200px]">
+          <Link href="/home" className="btn-brand inline-block mt-4 no-underline max-w-[200px]">
             Start Shopping
           </Link>
         </div>

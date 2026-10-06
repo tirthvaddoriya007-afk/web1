@@ -15,19 +15,26 @@ export default async function AdminSettingsPage() {
     .maybeSingle();
 
   return (
-    <div>
-      <h1 className="text-lg font-semibold text-gray-900">UPI settings</h1>
-      <p className="mt-1 mb-4 text-sm text-gray-500">
-        These details are used for every UPI payment on the storefront.
-      </p>
-      <UpiSettingsForm
-        initial={{
-          upi_vpa: data?.upi_vpa ?? "",
-          upi_payee_name: data?.upi_payee_name ?? "",
-          upi_merchant_code: data?.upi_merchant_code ?? "",
-          meta_pixel_id: data?.meta_pixel_id ?? "",
-        }}
-      />
+    <div className="space-y-6">
+      <section>
+        <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">
+          Payment
+        </h2>
+        <p className="mt-1 text-sm text-gray-600">
+          These details are used for every UPI payment on the storefront.
+          Changes go live instantly for all visitors.
+        </p>
+        <div className="mt-3">
+          <UpiSettingsForm
+            initial={{
+              upi_vpa: data?.upi_vpa ?? "",
+              upi_payee_name: data?.upi_payee_name ?? "",
+              upi_merchant_code: data?.upi_merchant_code ?? "",
+              meta_pixel_id: data?.meta_pixel_id ?? "",
+            }}
+          />
+        </div>
+      </section>
     </div>
   );
 }
