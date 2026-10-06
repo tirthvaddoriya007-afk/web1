@@ -1,56 +1,80 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isCrawler, isPhone } from "@/lib/ua";
 
-// Refreshes the Supabase session cookie and gates /admin/* behind a login.
-// The real authorisation check (is this user in public.admins?) happens in
-// app/admin/layout.tsx — this only keeps unauthenticated visitors out early.
+// Two jobs:
+//  1. /admin/* — refresh the Supabase session cookie and gate the panel behind
+//     a login. The real authorisation check (is this user in public.admins?)
+//     happens in app/admin/layout.tsx; this only keeps unauthenticated
+//     visitors out early.
+//  2. Storefront — phone-only gate. Phones get the full site; desktop/tablet
+//     visitors (iPad included) are rewritten to /mobile-only, an endless
+//     loader. SEO/social crawlers still see the real site so ad and link
+//     previews work. Admin paths are never gated.
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login" && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+  if (pathname.startsWith("/admin")) {
+    let response = NextResponse.next({ request });
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            response = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (pathname !== "/admin/login" && !user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname === "/admin/login" && user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+
+    return response;
   }
 
-  if (pathname === "/admin/login" && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    url.search = "";
-    return NextResponse.redirect(url);
+  // Storefront device gate (the loader route itself is exempt).
+  if (pathname !== "/mobile-only") {
+    const ua = request.headers.get("user-agent") ?? "";
+    if (!isPhone(ua) && !isCrawler(ua)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/mobile-only";
+      url.search = "";
+      return NextResponse.rewrite(url);
+    }
   }
 
-  return response;
+  return NextResponse.next({ request });
 }
 
+// Everything except API routes and Next internals. /admin is included — the
+// branch above handles it. Static assets (public/*) never reach middleware.
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

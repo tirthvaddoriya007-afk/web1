@@ -19,6 +19,30 @@ export function isBot(ua: string): boolean {
   return BOT_RE.test(ua);
 }
 
+// Phones only — iPad/tablets are deliberately NOT phones here: the store is
+// phone-only and desktop/iPad visitors get the loader screen instead. This
+// also correctly excludes iPadOS 13+ which reports as "Macintosh", and
+// Android tablets whose Chrome UA drops the "Mobile" token.
+const PHONE_RE =
+  /iphone|ipod|android[\s\S]*?mobile|windows phone|iemobile|blackberry|opera mini|webos/i;
+
+export function isPhone(ua: string): boolean {
+  if (!ua) return false;
+  const s = ua.toLowerCase();
+  if (/ipad|macintosh|tablet/i.test(s)) return false;
+  return PHONE_RE.test(s);
+}
+
+// SEO + social crawlers that must see the real storefront (search indexing and
+// ad/link previews). Wider than isBot: several preview crawlers have no "bot"
+// token in their UA (facebookexternalhit, WhatsApp, Telegram, …).
+const CRAWLER_RE =
+  /facebookexternalhit|metaexternalagent|whatsapp|telegram|pinterest|linkedin|discord|viber/i;
+
+export function isCrawler(ua: string): boolean {
+  return isBot(ua) || CRAWLER_RE.test(ua);
+}
+
 export function classifyUserAgent(ua: string): { client: string; device: string } {
   const s = ua.toLowerCase();
 
