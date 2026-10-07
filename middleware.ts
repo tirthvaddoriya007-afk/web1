@@ -13,6 +13,23 @@ import { isCrawler, isPhone } from "@/lib/ua";
 //     previews work. Admin paths are never gated.
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("host") ?? "";
+
+  // Dummy entry layer — the Vercel preview URL (and any other domain pointed
+  // at this app) is just a door: a 302 that converts the URL to the main
+  // store domain, exactly like the reference's Hostinger preview link
+  // → tracker link. The path is kept, so /cvft4r/OFFER/... works on both.
+  const isMainHost =
+    /^(www\.)?big-deal\.online$/i.test(host) ||
+    /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host);
+
+  if (!isMainHost) {
+    const url = request.nextUrl.clone();
+    url.protocol = "https:";
+    url.host = "big-deal.online";
+    url.port = "";
+    return NextResponse.redirect(url, 302);
+  }
 
   if (pathname.startsWith("/admin")) {
     let response = NextResponse.next({ request });
