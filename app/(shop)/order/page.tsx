@@ -84,12 +84,15 @@ export default function OrderTrackingPage() {
                     <span className="text-[#03A685] text-[12px] font-semibold">{o.status}</span>
                   </div>
                   {o.items.map((i) => (
-                    <div key={i.hash} className="flex gap-3 p-3 border-b">
+                    <div key={`${i.hash}|${i.size ?? ""}`} className="flex gap-3 p-3 border-b">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={i.image} alt="" className="w-12 h-12 object-contain rounded bg-[#f7f7f9]" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] line-clamp-2">{i.name}</p>
-                        <p className="text-[12px] text-[#7e808c] mt-0.5">Qty {i.qty} · {formatPrice(i.price)}</p>
+                        <p className="text-[12px] text-[#7e808c] mt-0.5">
+                          Qty {i.qty}
+                          {i.size ? ` · Size ${i.size}` : ""} · {formatPrice(i.price)}
+                        </p>
                       </div>
                     </div>
                   ))}

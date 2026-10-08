@@ -4,17 +4,17 @@ import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { useStore } from "@/lib/store";
 
-export default function AddToCartBar({ product }: { product: Product }) {
+export default function AddToCartBar({ product, size }: { product: Product; size: string }) {
   const { addItem, openCart } = useStore();
   const router = useRouter();
 
   const add = () => {
-    addItem(product, 1);
+    addItem(product, 1, size);
     openCart();
   };
 
   const buyNow = () => {
-    addItem(product, 1);
+    addItem(product, 1, size);
     router.push("/cart");
   };
 

@@ -15,9 +15,9 @@ interface StoreCtx {
   promoDiscount: number;
   freeCount: number;
   payable: number;
-  addItem: (p: Product, qty?: number) => void;
-  removeItem: (hash: string) => void;
-  setQty: (hash: string, qty: number) => void;
+  addItem: (p: Product, qty?: number, size?: string) => void;
+  removeItem: (hash: string, size?: string) => void;
+  setQty: (hash: string, size: string | undefined, qty: number) => void;
   clear: () => void;
   address: Address | null;
   saveAddress: (a: Address) => void;
@@ -66,9 +66,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (ready) write(CART_KEY, items);
   }, [items, ready]);
 
-  const addItem = useCallback((p: Product, qty = 1) => {
+  const addItem = useCallback((p: Product, qty = 1, size?: string) => {
     setItems((prev) => {
-      const idx = prev.findIndex((i) => i.hash === p.hash);
+      const idx = prev.findIndex((i) => i.hash === p.hash && (i.size ?? "") === (size ?? ""));
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = { ...next[idx], qty: next[idx].qty + qty };
@@ -76,19 +76,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
       return [
         ...prev,
-        { hash: p.hash, name: p.name, price: p.price, mrp: p.mrp, image: p.image, qty },
+        { hash: p.hash, name: p.name, price: p.price, mrp: p.mrp, image: p.image, qty, size },
       ];
     });
   }, []);
 
-  const removeItem = useCallback((hash: string) => {
-    setItems((prev) => prev.filter((i) => i.hash !== hash));
+  const removeItem = useCallback((hash: string, size?: string) => {
+    setItems((prev) => prev.filter((i) => !(i.hash === hash && (i.size ?? "") === (size ?? ""))));
   }, []);
 
-  const setQty = useCallback((hash: string, qty: number) => {
+  const setQty = useCallback((hash: string, size: string | undefined, qty: number) => {
     setItems((prev) =>
       prev
-        .map((i) => (i.hash === hash ? { ...i, qty: Math.max(0, qty) } : i))
+        .map((i) =>
+          i.hash === hash && (i.size ?? "") === (size ?? "") ? { ...i, qty: Math.max(0, qty) } : i
+        )
         .filter((i) => i.qty > 0)
     );
   }, []);

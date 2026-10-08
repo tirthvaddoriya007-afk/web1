@@ -1,3 +1,8 @@
+export interface AdditionalInfoRow {
+  label: string;
+  value: string;
+}
+
 export interface Product {
   id: number | null;
   hash: string;
@@ -11,6 +16,13 @@ export interface Product {
   categories: string[];
   category: string;
   order_number?: number;
+  /** Product Highlights — admin-entered at upload time. */
+  fabric?: string;
+  color?: string;
+  pattern?: string;
+  fit_shape?: string;
+  /** Additional Information dropdown — admin-entered key–value rows. */
+  additional_info?: AdditionalInfoRow[];
 }
 
 export interface Category {
@@ -28,6 +40,8 @@ export interface CartItem {
   mrp: number;
   image: string;
   qty: number;
+  /** Selected size (S/M/L/XL/XXL/XXXL) — optional so older saved carts still load. */
+  size?: string;
 }
 
 export interface Address {

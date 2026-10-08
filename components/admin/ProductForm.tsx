@@ -6,6 +6,10 @@ import type { Product } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { uploadStoreImage } from "@/lib/supabase/storage";
 import { invalidateAll } from "@/lib/admin/revalidate";
+import { ADDITIONAL_INFO_FIELDS } from "@/lib/productDetails";
+
+/** Max gallery photos per product (migration 001's `images` column holds them). */
+const IMAGE_SLOTS = 10;
 
 function randomHash(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -40,11 +44,21 @@ export default function ProductForm({
   const [badge, setBadge] = useState(product?.badge ?? "");
   const [category, setCategory] = useState(product?.category ?? categories[0] ?? "");
   const [order, setOrder] = useState(String(product?.order_number ?? nextOrder));
-  const [images, setImages] = useState<string[]>([
-    product?.images?.[0] ?? product?.image ?? "",
-    product?.images?.[1] ?? "",
-    product?.images?.[2] ?? "",
-  ]);
+  const [images, setImages] = useState<string[]>(() => {
+    const arr = Array.from({ length: IMAGE_SLOTS }, (_, i) => product?.images?.[i] ?? "");
+    if (!arr.some(Boolean) && product?.image) arr[0] = product.image;
+    return arr;
+  });
+  const [fabric, setFabric] = useState(product?.fabric ?? "");
+  const [color, setColor] = useState(product?.color ?? "");
+  const [pattern, setPattern] = useState(product?.pattern ?? "");
+  const [fitShape, setFitShape] = useState(product?.fit_shape ?? "");
+  const [infoValues, setInfoValues] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const k of ADDITIONAL_INFO_FIELDS) map[k] = "";
+    for (const r of product?.additional_info ?? []) if (r.label) map[r.label] = r.value ?? "";
+    return map;
+  });
 
   const [uploading, setUploading] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -93,7 +107,7 @@ export default function ProductForm({
     if (!images[0]) return setError("Upload at least the first product image.");
     if (!Number.isFinite(desiredOrder) || desiredOrder < 1) return setError("Order number must be 1 or more.");
 
-    const cleanImages = images.slice(0, 3).filter(Boolean);
+    const cleanImages = images.slice(0, IMAGE_SLOTS).filter(Boolean);
     const payload = {
       name: name.trim(),
       price: p,
@@ -104,6 +118,15 @@ export default function ProductForm({
       badge: badge.trim(),
       categories: [category],
       category,
+      fabric: fabric.trim(),
+      color: color.trim(),
+      pattern: pattern.trim(),
+      fit_shape: fitShape.trim(),
+      // Only filled Additional Details fields are stored, in reference order.
+      additional_info: ADDITIONAL_INFO_FIELDS.filter((k) => infoValues[k]?.trim()).map((k) => ({
+        label: k,
+        value: infoValues[k].trim(),
+      })),
     };
 
     setSaving(true);
@@ -162,13 +185,13 @@ export default function ProductForm({
 
       {/* Images */}
       <section className="rounded-xl bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-900">Product images (up to 3)</h3>
+        <h3 className="text-sm font-bold text-gray-900">Product images (up to {IMAGE_SLOTS})</h3>
         <p className="mt-1 text-xs text-gray-500">
           First image is the main one. Square 1:1 recommended, max 2 MB each.
           Uploaded images go live on the storefront instantly.
         </p>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[0, 1, 2].map((idx) => (
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: IMAGE_SLOTS }, (_, i) => i).map((idx) => (
             <div key={idx}>
               <label className={labelCls}>
                 Image {idx + 1}
@@ -288,6 +311,57 @@ export default function ProductForm({
               products down.
             </span>
           </label>
+        </div>
+      </section>
+
+      {/* Product highlights */}
+      <section className="rounded-xl bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-900">Product highlights</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          Shown in the &quot;Product Highlights&quot; grid on the storefront. Leave
+          blank and the section is hidden.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className={labelCls}>
+            Fabric
+            <input value={fabric} onChange={(e) => setFabric(e.target.value)} placeholder="e.g. Poly Blend" className={inputCls} />
+          </label>
+          <label className={labelCls}>
+            Color
+            <input value={color} onChange={(e) => setColor(e.target.value)} placeholder="e.g. Cream" className={inputCls} />
+          </label>
+          <label className={labelCls}>
+            Pattern
+            <input value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="e.g. Printed" className={inputCls} />
+          </label>
+          <label className={labelCls}>
+            Fit/Shape
+            <input value={fitShape} onChange={(e) => setFitShape(e.target.value)} placeholder="e.g. Regular" className={inputCls} />
+          </label>
+        </div>
+      </section>
+
+      {/* Additional details */}
+      <section className="rounded-xl bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-900">Additional details</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          Shown inside the collapsible &quot;Additional Details&quot; section on the
+          storefront — only filled fields are displayed, in this order.
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {ADDITIONAL_INFO_FIELDS.map((k) => (
+            <label key={k} className={labelCls}>
+              {k}
+              <input
+                value={infoValues[k]}
+                onChange={(e) =>
+                  setInfoValues((prev) => ({ ...prev, [k]: e.target.value }))
+                }
+                placeholder="Leave blank to hide"
+                className={inputCls}
+              />
+            </label>
+          ))}
         </div>
       </section>
 

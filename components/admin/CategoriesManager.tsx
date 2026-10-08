@@ -87,11 +87,17 @@ export default function CategoriesManager({
     if (!window.confirm(msg)) return;
     setBusy(true);
     setError("");
-    const { error: delError } = await createClient().from("categories").delete().eq("id", c.id);
+    // Rows loaded from the static fallback have no id (the live table was
+    // empty), and `eq("id", undefined)` makes PostgREST fail with a
+    // "failed to parse undefined" syntax error. Delete by id when present,
+    // otherwise by slug — both are unique.
+    let query = createClient().from("categories").delete();
+    query = c.id != null ? query.eq("id", c.id) : query.eq("slug", c.slug);
+    const { error: delError } = await query;
     setBusy(false);
-    if (delError) return setError(delError.message);
+    if (delError) return setError(`Could not delete "${c.name}": ${delError.message}`);
     invalidateAll();
-    setList((prev) => prev.filter((x) => x.id !== c.id));
+    setList((prev) => prev.filter((x) => (x.id ?? x.slug) !== (c.id ?? c.slug)));
     router.refresh();
   }
 

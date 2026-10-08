@@ -30,13 +30,13 @@ export default function CartDrawer({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             items.map((i) => (
-              <div key={i.hash} className="flex gap-3 px-4 py-4 border-b">
+              <div key={`${i.hash}|${i.size ?? ""}`} className="flex gap-3 px-4 py-4 border-b">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={i.image} alt="" className="w-16 h-16 object-cover rounded bg-[#f7f7f9] shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between gap-2">
                     <p className="text-[14px] text-[#333] truncate">{i.name}</p>
-                    <button onClick={() => removeItem(i.hash)} aria-label="Remove" className="shrink-0 text-[#8b8b93]">
+                    <button onClick={() => removeItem(i.hash, i.size)} aria-label="Remove" className="shrink-0 text-[#8b8b93]">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
                       </svg>
@@ -47,11 +47,13 @@ export default function CartDrawer({ onClose }: { onClose: () => void }) {
                     <span className="text-[13px] text-[#9b9b9b] line-through">₹{Math.round(i.mrp)}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2.5">
-                    <span className="text-[13px] text-[#535766]">Qty : {String(i.qty).padStart(2, "0")}</span>
+                    <span className="text-[13px] text-[#535766]">
+                      {i.size ? `Size : ${i.size} · ` : ""}Qty : {String(i.qty).padStart(2, "0")}
+                    </span>
                     <div className="inline-flex items-center bg-[#f5f5f7] rounded-md text-[14px]">
-                      <button className="px-2.5 py-1 text-[#535766]" onClick={() => setQty(i.hash, i.qty - 1)}>-</button>
+                      <button className="px-2.5 py-1 text-[#535766]" onClick={() => setQty(i.hash, i.size, i.qty - 1)}>-</button>
                       <span className="px-2 min-w-[26px] text-center">{String(i.qty).padStart(2, "0")}</span>
-                      <button className="px-2.5 py-1 text-[#535766]" onClick={() => setQty(i.hash, i.qty + 1)}>+</button>
+                      <button className="px-2.5 py-1 text-[#535766]" onClick={() => setQty(i.hash, i.size, i.qty + 1)}>+</button>
                     </div>
                   </div>
                 </div>

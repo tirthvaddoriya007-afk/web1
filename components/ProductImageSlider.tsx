@@ -3,19 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Swipeable product image carousel (1–3 images). Native scroll-snap for the
- * swipe gesture + arrow buttons + dot indicators + a "1/3" counter. The first
+ * Swipeable product image carousel (up to 10 images). Native scroll-snap for
+ * the swipe gesture + arrow buttons + a "1/N" counter + a horizontal thumbnail
+ * strip below the hero. Tapping a thumbnail scrolls the hero to that photo;
+ * the active thumbnail is highlighted with the brand-colored border. The first
  * image loads eagerly, the rest lazily, so the hero never waits for images
- * the visitor hasn't swiped to yet.
+ * the visitor hasn't reached yet.
  */
 export default function ProductImageSlider({ images, name }: { images: string[]; name: string }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const rafRef = useRef<number | null>(null);
   const [index, setIndex] = useState(0);
   const list = images.filter(Boolean);
 
   // rAF-throttled: scroll fires many times per frame while swiping, so the
-  // index (arrows/dots/counter) only updates once per paint.
+  // index (arrows/thumbs/counter) only updates once per paint.
   const onScroll = useCallback(() => {
     if (rafRef.current !== null) return;
     rafRef.current = requestAnimationFrame(() => {
@@ -32,6 +35,15 @@ export default function ProductImageSlider({ images, name }: { images: string[];
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
   }, []);
+
+  // Keep the selected thumbnail visible inside the strip as the hero changes.
+  useEffect(() => {
+    thumbRefs.current[index]?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [index]);
 
   const goTo = (i: number) => {
     const el = trackRef.current;
@@ -99,23 +111,32 @@ export default function ProductImageSlider({ images, name }: { images: string[];
           <span className="absolute right-3 bottom-3 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white">
             {index + 1}/{list.length}
           </span>
-
-          {/* dots */}
-          <div className="flex justify-center gap-1.5 pt-3">
-            {list.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => goTo(i)}
-                aria-label={`Go to image ${i + 1}`}
-                className="h-1.5 rounded-full transition-all"
-                style={{
-                  width: i === index ? 18 : 6,
-                  background: i === index ? "var(--brand)" : "#d8d8dd",
-                }}
-              />
-            ))}
-          </div>
         </>
+      )}
+
+      {/* Thumbnail strip — all photos for this product, tap to open in hero */}
+      {list.length > 1 && (
+        <div
+          className="flex gap-2.5 overflow-x-auto pt-3 pb-1 -mx-4 px-4"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {list.map((src, i) => (
+            <button
+              key={src}
+              ref={(el) => {
+                thumbRefs.current[i] = el;
+              }}
+              type="button"
+              onClick={() => goTo(i)}
+              aria-label={`View photo ${i + 1}`}
+              className="shrink-0 w-14 h-14 rounded-lg border-2 overflow-hidden bg-[#f7f7f9]"
+              style={{ borderColor: i === index ? "#9f2089" : "#e6e6ec" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" draggable={false} />
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

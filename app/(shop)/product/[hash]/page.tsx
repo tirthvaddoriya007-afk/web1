@@ -1,54 +1,26 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { formatPrice, specialOffer, seededRandom } from "@/lib/data";
-import { getProductByHash, getForYouProducts, getReviews } from "@/lib/catalog";
+import { getProductByHash } from "@/lib/catalog";
 import { buildRatings } from "@/lib/reviews";
-import type { Review as DbReview } from "@/lib/types";
-import AddToCartBar from "@/components/AddToCartBar";
-import ProductCardOffer from "@/components/ProductCardOffer";
+import ProductPurchase from "@/components/ProductPurchase";
 import ProductImageSlider from "@/components/ProductImageSlider";
+import ProductHighlights from "@/components/ProductHighlights";
+import AdditionalInfo from "@/components/AdditionalInfo";
 import TrustedLogo from "@/components/TrustedLogo";
+import ReviewsSection from "./ReviewsSection";
+import ForYouSection from "./ForYouSection";
 
-// Live product data — served through the 10s SWR cache, so admin edits (price,
+// Live product data — served through the 60s SWR cache, so admin edits (price,
 // images, position) are visible instantly via /api/revalidate while shoppers
-// never wait on the database.
+// never wait on the database. The shell below only depends on the single
+// product query; reviews and "Products For You" stream in afterwards, so the
+// hero, price and buy bar appear as fast as possible.
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: { hash: string } }) {
   const p = await getProductByHash(params.hash);
   return { title: p ? p.name : "Product" };
-}
-
-function specRows(name: string) {
-  return [
-    ["Brand", "In-house"],
-    ["Quantity", name],
-    ["Type", name],
-    ["Variant", "Raw"],
-    ["Container Type", name],
-    ["Model Name", name],
-    ["Combo", /combo/i.test(name) ? "Yes" : "No"],
-    ["Maximum Shelf Life", "12 Months"],
-    ["Added Preservatives", "No"],
-    ["Gift Pack", "No"],
-    ["Manufactured By", "In-house"],
-    ["Nutrient Content", "NA"],
-    ["Net Quantity", name],
-  ];
-}
-
-function formatReviewDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return (
-    "Posted on " +
-    d.toLocaleDateString("en-US", {
-      timeZone: "UTC",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })
-  );
 }
 
 export default async function ProductPage({ params }: { params: { hash: string } }) {
@@ -59,38 +31,26 @@ export default async function ProductPage({ params }: { params: { hash: string }
   const ratings = buildRatings(product.hash, product.image);
   const offer = specialOffer(product.hash, product.price);
 
-  const [forYou, sharedReviews] = await Promise.all([
-    getForYouProducts(product.category, product.hash, 8),
-    getReviews(),
-  ]);
-
-  // Shared reviews (same on every product) — each rendered with THIS product's
-  // image. Falls back to the seeded reviews if the reviews table is empty.
-  const reviewCards = (sharedReviews.length > 0 ? sharedReviews : []).map((r: DbReview) => {
-    const helpfulRnd = seededRandom("helpful:" + r.id);
-    return {
-      name: r.name,
-      rating: Number(r.rating).toFixed(1),
-      date: formatReviewDate(r.created_at) || "Posted on October 1, 2025",
-      text: r.comment,
-      helpful: 50 + Math.floor(helpfulRnd() * 850),
-      image: product.image,
-    };
-  });
-  const shownReviews =
-    reviewCards.length > 0
-      ? reviewCards
-      : ratings.reviews.map((r) => ({ ...r, image: product.image }));
-
   // Small independent rating pair for the top row (separate from reviews block).
   const tr = seededRandom("top:" + product.hash);
   const topRatings = 100 + Math.floor(tr() * 900);
   const topReviews = 10 + Math.floor(tr() * 50);
   const topStar = Math.floor(Number(ratings.average));
 
+  // Admin-entered sections — hidden until the product has data for them.
+  const highlightRows: [string, string][] = (
+    [
+      ["Fabric", product.fabric ?? ""],
+      ["Color", product.color ?? ""],
+      ["Pattern", product.pattern ?? ""],
+      ["Fit/Shape", product.fit_shape ?? ""],
+    ] as [string, string][]
+  ).filter(([, v]) => Boolean(v.trim()));
+  const infoRows = (product.additional_info ?? []).filter((r) => Boolean(r.label?.trim()));
+
   return (
     <div className="pb-16 bg-[#f4f4f6]">
-      {/* Image slider (1–3 images, swipeable) */}
+      {/* Image slider (up to 10 images, swipeable + thumbnail strip) */}
       <div className="bg-white px-4 pt-4">
         <ProductImageSlider images={images} name={product.name} />
       </div>
@@ -158,94 +118,19 @@ export default async function ProductPage({ params }: { params: { hash: string }
         <p className="text-[13px] font-bold mt-3">Free Delivery</p>
       </div>
 
-      {/* Product Details */}
-      <div className="bg-white mt-2 px-4 py-4">
-        <h6 className="font-bold text-[17px] mb-3">Product Details</h6>
-        {/* spec td — 12px demi, #212529 */}
-        <table className="w-full text-[12px]">
-          <tbody>
-            {specRows(product.name).map(([k, v]) => (
-              <tr key={k} className="align-top">
-                <td className="py-2.5 pr-3 text-[#8b8ba3] w-[112px] leading-snug">{k}</td>
-                <td className="py-2.5 text-[#212529] font-semibold leading-snug">
-                  <span className="text-[#7e808c] mr-2">•</span>
-                  {v}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Select Size + Sold by + sticky buy bar (client) */}
+      <ProductPurchase product={product} />
 
-      {/* Ratings & Reviews */}
-      <div className="bg-white mt-2" id="reviews">
-        {/* heading block — padding 1px 16px */}
-        <div className="px-4 py-px">
-          <h6 className="font-bold text-[17px]">Product Ratings &amp; Reviews</h6>
-        </div>
+      {/* Product Highlights — admin-entered at upload time */}
+      {highlightRows.length > 0 && <ProductHighlights rows={highlightRows} />}
 
-        {/* count wrapper — padding 4px 16px */}
-        <div className="flex gap-4 px-4 py-1">
-          <div className="shrink-0 w-[62px]">
-            {/* average — 35px bold greenBase + 12px star, baseline-aligned */}
-            <div className="flex items-center gap-1">
-              <span className="text-[35px] leading-none font-bold text-[#038d63]">{ratings.average}</span>
-              <Star size={12} fill="#038d63" />
-            </div>
-            <div className="text-[11px] text-[#8b8ba3] mt-2 leading-tight">{ratings.ratingCount} Ratings,</div>
-            <div className="text-[11px] text-[#8b8ba3] mt-1.5 leading-tight">{ratings.reviewCount} Reviews</div>
-          </div>
-          <div className="flex-1 space-y-1.5 pt-1">
-            {ratings.buckets.map((b) => (
-              <div key={b.label} className="flex items-center text-[12px]">
-                {/* .rating_label — 12px demi #212529, right-aligned, margin-right 12px */}
-                <span className="w-[61px] mr-3 text-right text-[#212529] font-semibold shrink-0">{b.label}</span>
-                <span className="flex-1 h-[6px] rounded-full bg-[#eaeaef] overflow-hidden">
-                  <span className="block h-full rounded-full" style={{ width: `${b.pct}%`, background: b.color }} />
-                </span>
-                <span className="w-9 ml-3 text-right text-[#212529]">{b.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Additional Details — admin-entered, collapsed by default */}
+      {infoRows.length > 0 && <AdditionalInfo rows={infoRows} />}
 
-        {/* comments — each card padding 10px 16px, separated by a full-width rule */}
-        <div className="mt-2">
-          {shownReviews.map((r, i) => (
-            <div key={i} className={`px-4 py-2.5 ${i > 0 ? "border-t border-[#eaeaef]" : ""}`}>
-              <div className="flex items-center gap-2">
-                <UserAvatar />
-                <span className="text-[13px] font-semibold text-[#212529]">{r.name}</span>
-              </div>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="inline-flex items-center gap-1 bg-[#038d63] text-white text-[13px] font-semibold px-2 py-0.5 rounded-[10px]">
-                  {r.rating}
-                  <Star size={8} />
-                </span>
-                <span className="text-[13px] text-[#353543]">{r.date}</span>
-              </div>
-              <p className="text-[13px] mt-2 text-[#353543]">{r.text}</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={r.image} alt="" width={48} height={48} className="w-12 h-12 object-cover rounded mt-2 bg-[#f7f7f9]" loading="lazy" decoding="async" />
-              <p className="text-[13px] text-[#666] mt-2 flex items-center gap-1.5">
-                {/* filled thumbs-up, matching the reference glyph */}
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="#666" aria-hidden>
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M4.712 5.245 8.68 1.13a1.039 1.039 0 0 1 1.51-.008c.258.268.366.647.294 1.018l-.68 3.402h4.046c1.54 0 2.578 1.635 1.977 3.106L13.492 14.3c-.229.542-.745.899-1.318.899H5.73c-.788 0-1.432-.669-1.432-1.486V6.293c0-.394.15-.773.415-1.048Zm-1.847 8.471c0 .818-.645 1.486-1.433 1.486-.787 0-1.432-.668-1.432-1.486V7.773c0-.817.645-1.486 1.432-1.486.788 0 1.433.67 1.433 1.486v5.943Z"
-                  />
-                </svg>
-                Helpful ({r.helpful})
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <Link href="#reviews" className="block px-4 pb-4 pt-2 text-[13px] font-bold tracking-wide" style={{ color: "var(--brand)" }}>
-          VIEW ALL REVIEWS ›
-        </Link>
-      </div>
+      {/* Ratings & Reviews — streamed after the shell */}
+      <Suspense fallback={<ReviewsSkeleton />}>
+        <ReviewsSection product={product} ratings={ratings} />
+      </Suspense>
 
       {/* Blue trust strip */}
       <div className="mt-2 flex items-center justify-between px-2 py-4" style={{ background: "#eaf1ff" }}>
@@ -256,17 +141,51 @@ export default async function ProductPage({ params }: { params: { hash: string }
         <TrustItem label="7-day Returns" icon={<ReturnIco />} />
       </div>
 
-      {/* Products For You */}
-      <div className="mt-2 bg-white pt-4">
-        <h6 className="font-bold text-[19px] px-4 mb-1">Products For You</h6>
-        <div className="product-grid">
-          {forYou.map((p) => (
-            <ProductCardOffer key={p.hash} product={p} />
+      {/* Products For You — streamed after the shell */}
+      <Suspense fallback={<ForYouSkeleton />}>
+        <ForYouSection category={product.category} excludeHash={product.hash} />
+      </Suspense>
+    </div>
+  );
+}
+
+/* ---------------------------- skeletons ------------------------------------ */
+function ReviewsSkeleton() {
+  return (
+    <div className="bg-white mt-2 animate-pulse">
+      <div className="px-4 py-4">
+        <div className="h-5 w-56 rounded bg-[#eaeaef]" />
+      </div>
+      <div className="flex gap-4 px-4 py-1">
+        <div className="w-[62px]">
+          <div className="h-9 w-16 rounded bg-[#eaeaef]" />
+          <div className="h-3 w-24 rounded bg-[#eaeaef] mt-3" />
+          <div className="h-3 w-20 rounded bg-[#eaeaef] mt-2" />
+        </div>
+        <div className="flex-1 space-y-2 pt-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-2.5 rounded bg-[#eaeaef]" />
           ))}
         </div>
       </div>
+      <div className="px-4 py-3 space-y-3">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="h-16 rounded bg-[#eaeaef]" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      <AddToCartBar product={product} />
+function ForYouSkeleton() {
+  return (
+    <div className="mt-2 bg-white pt-4 pb-4 animate-pulse">
+      <div className="h-6 w-40 rounded bg-[#eaeaef] mx-4" />
+      <div className="grid grid-cols-2 gap-3 px-4 mt-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-48 rounded bg-[#eaeaef]" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -285,16 +204,6 @@ function Action({ label, children }: { label: string; children: React.ReactNode 
       {children}
       <span>{label}</span>
     </div>
-  );
-}
-function UserAvatar() {
-  return (
-    <span className="w-7 h-7 rounded-full bg-[#F7F9FF] grid place-items-center">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="#c7d3f0">
-        <circle cx="12" cy="9" r="4" />
-        <path d="M4 21a8 8 0 0 1 16 0z" />
-      </svg>
-    </span>
   );
 }
 function TrustItem({ label, icon }: { label: string; icon: React.ReactNode }) {

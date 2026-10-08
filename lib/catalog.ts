@@ -8,7 +8,7 @@ import type { Product, Category, Review, HomeContent } from "./types";
 // =============================================================================
 // Storefront catalogue — read-only Supabase access.
 //
-// Every read is cached in Next's Data Cache for 10 seconds (stale-while-
+// Every read is cached in Next's Data Cache for 60 seconds (stale-while-
 // revalidate) and tagged "catalog": shopper pages render without waiting on
 // Supabase, and an admin save calls /api/revalidate (revalidateTag("catalog"))
 // so edits still go live instantly for the very next visitor. Each function
@@ -17,7 +17,7 @@ import type { Product, Category, Review, HomeContent } from "./types";
 // =============================================================================
 
 const PRODUCT_COLUMNS =
-  "id, hash, name, price, mrp, off, image, images, badge, categories, category, order_number";
+  "id, hash, name, price, mrp, off, image, images, badge, categories, category, order_number, fabric, color, pattern, fit_shape, additional_info";
 
 const catalogClient = createSupabaseClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,9 +25,9 @@ const catalogClient = createSupabaseClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-/** Data-Cache wrapper: 10s SWR + "catalog" tag for admin-triggered purges. */
+/** Data-Cache wrapper: 60s SWR + "catalog" tag for admin-triggered purges. */
 function cachedQuery<T>(key: string[], fn: () => Promise<T>): Promise<T> {
-  return unstable_cache(fn, key, { revalidate: 10, tags: ["catalog"] })();
+  return unstable_cache(fn, key, { revalidate: 60, tags: ["catalog"] })();
 }
 
 const CATEGORY_COLUMNS = "id, slug, orig_slug, name";
@@ -282,7 +282,8 @@ export const getReviews = cache((): Promise<Review[]> =>
       const { data } = await catalogClient
         .from("reviews")
         .select("id, name, rating, comment, created_at")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(20);
       return (data as Review[]) ?? [];
     } catch {
       return [];

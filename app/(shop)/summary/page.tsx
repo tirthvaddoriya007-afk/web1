@@ -49,13 +49,15 @@ function SummaryInner() {
       <div className="bg-white mt-2 px-4 py-4">
         <h3 className="font-bold text-[15px] mb-3">Order Details</h3>
         {order.items.map((i) => (
-          <div key={i.hash} className="flex gap-3 py-2.5 border-b last:border-0">
+          <div key={`${i.hash}|${i.size ?? ""}`} className="flex gap-3 py-2.5 border-b last:border-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={i.image} alt="" className="w-14 h-14 object-cover rounded bg-[#f7f7f9]" />
             <div className="flex-1 min-w-0">
               <p className="text-[13px] text-[#333] line-clamp-2">{i.name}</p>
               <p className="text-[12px] text-[#7e808c] mt-1">
-                Qty {i.qty} · <span className="font-semibold text-[#1a2024]">{formatPrice(i.price)}</span>
+                Qty {i.qty}
+                {i.size ? ` · Size ${i.size}` : ""} ·{" "}
+                <span className="font-semibold text-[#1a2024]">{formatPrice(i.price)}</span>
               </p>
             </div>
           </div>
