@@ -29,9 +29,13 @@ export default function HomeContentForm({ initial }: { initial: HomeContent }) {
     setError("");
   };
 
-  const setRedirectSeconds = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
-    setForm((f) => ({ ...f, welcome_redirect_seconds: v }));
+  // The seconds input is kept as free text so the admin can type "0.5", "1.",
+  // "1.8" without the browser mangling it; it is parsed and clamped to one
+  // decimal on save.
+  const [secondsText, setSecondsText] = useState(String(initial.welcome_redirect_seconds));
+
+  const toggleEnabled = () => {
+    setForm((f) => ({ ...f, welcome_enabled: !f.welcome_enabled }));
     setStatus("idle");
     setError("");
   };
@@ -61,6 +65,14 @@ export default function HomeContentForm({ initial }: { initial: HomeContent }) {
     e.preventDefault();
     setSaving(true);
     setError("");
+
+    // Free-text seconds → decimal number, clamped to 0–999.9, one decimal.
+    const redirectSeconds = Math.min(
+      999.9,
+      Math.max(0, Math.round((Number(secondsText) || 0) * 10) / 10)
+    );
+    setSecondsText(String(redirectSeconds));
+
     const { error: updateError } = await createClient()
       .from("settings")
       .update({
@@ -71,7 +83,8 @@ export default function HomeContentForm({ initial }: { initial: HomeContent }) {
         banner2_link: form.banner2_link.trim(),
         banner2_alt: form.banner2_alt.trim(),
         promo_text: form.promo_text.trim(),
-        welcome_redirect_seconds: form.welcome_redirect_seconds,
+        welcome_redirect_seconds: redirectSeconds,
+        welcome_enabled: form.welcome_enabled,
       })
       .eq("id", 1);
 
@@ -143,23 +156,59 @@ export default function HomeContentForm({ initial }: { initial: HomeContent }) {
       </section>
 
       <section className="rounded-xl bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-900">Welcome page auto-redirect</h3>
+        <h3 className="text-sm font-bold text-gray-900">Welcome page</h3>
         <p className="mt-1 text-xs text-gray-500">
-          Seconds a visitor stays on the welcome landing before being sent to the
-          home page automatically. Visitors can always tap anywhere on the page to
-          go immediately. Set 0 to disable the timer.
+          The landing screen shown at / with one product and the "Continue to
+          Shopping" button. Turn OFF to skip it entirely — visitors go straight
+          to the home page.
         </p>
-        <label className={`${labelCls} mt-4`}>
-          Redirect after (seconds)
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={form.welcome_redirect_seconds}
-            onChange={setRedirectSeconds}
-            className={inputCls}
-          />
-        </label>
+
+        <button
+          type="button"
+          onClick={toggleEnabled}
+          className="mt-4 flex items-center gap-3"
+          aria-pressed={form.welcome_enabled}
+        >
+          <span
+            className={`relative h-6 w-11 rounded-full transition-colors ${
+              form.welcome_enabled ? "bg-green-500" : "bg-gray-300"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                form.welcome_enabled ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </span>
+          <span className="text-sm font-semibold text-gray-800">
+            {form.welcome_enabled
+              ? "ON — welcome page shows first"
+              : "OFF — visitors go straight to the home page"}
+          </span>
+        </button>
+
+        <div className={form.welcome_enabled ? "" : "pointer-events-none opacity-40"}>
+          <label className={`${labelCls} mt-4`}>
+            Redirect after (seconds)
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={secondsText}
+              onChange={(e) => {
+                setSecondsText(e.target.value);
+                setStatus("idle");
+                setError("");
+              }}
+              disabled={!form.welcome_enabled}
+              className={inputCls}
+            />
+          </label>
+          <p className="mt-1 text-xs text-gray-400">
+            Decimals allowed (0.5, 1.5, 1.8…). 0 = no auto-redirect, the visitor
+            must tap to continue.
+          </p>
+        </div>
       </section>
 
       <div className="flex items-center gap-3">

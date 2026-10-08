@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { brand } from "@/lib/brand";
 import { getFeaturedProducts, getHomeContent } from "@/lib/catalog";
 import WelcomeClient from "@/components/WelcomeClient";
@@ -18,7 +19,13 @@ export const dynamic = "force-dynamic";
 // handles the interactions: tap anywhere to go home, and an admin-tunable
 // auto-redirect timer for visitors who never tap.
 export default async function WelcomePage() {
-  const [featured, content] = await Promise.all([getFeaturedProducts(2), getHomeContent()]);
+  const content = await getHomeContent();
+
+  // Admin switched the welcome landing OFF — skip it entirely and send
+  // visitors straight to the home page.
+  if (!content.welcome_enabled) redirect("/home");
+
+  const featured = await getFeaturedProducts(2);
   const product = featured[0];
   const second = featured[1];
 

@@ -13,7 +13,8 @@ import MetaPixel from "@/components/MetaPixel";
  * Welcome landing — chromeless, exactly one call to action: get to /home.
  * Every tap anywhere on the page navigates there (and counts as a welcome
  * tap in admin analytics); if the visitor never taps, the auto-redirect
- * timer (settings.welcome_redirect_seconds, 0 = off) does it for them.
+ * timer (settings.welcome_redirect_seconds, fractional values like 0.5 or
+ * 1.8 allowed, 0 = off) does it for them.
  */
 export default function WelcomeClient({
   product,

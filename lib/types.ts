@@ -66,6 +66,8 @@ export interface HomeContent {
   banner2_link: string;
   banner2_alt: string;
   promo_text: string;
-  /** Seconds the welcome landing stays before auto-redirect to /home; 0 disables. */
+  /** Seconds the welcome landing stays before auto-redirect to /home; 0 disables. Decimals allowed (0.5, 1.8…). */
   welcome_redirect_seconds: number;
+  /** Master switch: false = welcome page skipped entirely, / goes straight to /home. */
+  welcome_enabled: boolean;
 }

@@ -42,7 +42,8 @@ create table if not exists public.settings (
   upi_payee_name text not null default '',
   upi_merchant_code text not null default '',
   meta_pixel_id  text not null default '',
-  welcome_redirect_seconds int not null default 1,
+  welcome_redirect_seconds numeric(4,1) not null default 1,
+  welcome_enabled boolean not null default true,
   updated_at     timestamptz not null default now()
 );
 
@@ -50,9 +51,17 @@ create table if not exists public.settings (
 -- Idempotent, so it is safe to run on a fresh database too.
 alter table public.settings add column if not exists meta_pixel_id text not null default '';
 
--- Welcome landing auto-redirect timer (seconds; 0 disables the timer).
--- Idempotent for databases created before the column existed.
-alter table public.settings add column if not exists welcome_redirect_seconds int not null default 1;
+-- Welcome landing auto-redirect timer (seconds; decimals allowed, 0 disables
+-- the timer) + master on/off switch for the welcome page.
+-- Idempotent for databases created before the columns existed.
+alter table public.settings add column if not exists welcome_redirect_seconds numeric(4,1) not null default 1;
+alter table public.settings add column if not exists welcome_enabled boolean not null default true;
+
+-- Older databases created the seconds column as int — widen it for decimals
+-- (0.5, 1.8, ...). Idempotent: no-op once it is already numeric.
+alter table public.settings
+  alter column welcome_redirect_seconds type numeric(4,1)
+  using welcome_redirect_seconds::numeric(4,1);
 
 -- Seed the single row so the admin screen always has something to update.
 insert into public.settings (id) values (1) on conflict (id) do nothing;

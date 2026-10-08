@@ -68,6 +68,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
   banner2_alt: "Mega Sale",
   promo_text: "Buy 2 Get 1 Free (Add 3 item to cart)",
   welcome_redirect_seconds: 1,
+  welcome_enabled: true,
 };
 
 export const getHomeContent = cache((): Promise<HomeContent> =>
@@ -76,7 +77,7 @@ export const getHomeContent = cache((): Promise<HomeContent> =>
       const { data } = await catalogClient
         .from("settings")
         .select(
-          "banner1_url, banner1_link, banner1_alt, banner2_url, banner2_link, banner2_alt, promo_text, welcome_redirect_seconds"
+          "banner1_url, banner1_link, banner1_alt, banner2_url, banner2_link, banner2_alt, promo_text, welcome_redirect_seconds, welcome_enabled"
         )
         .eq("id", 1)
         .maybeSingle();
@@ -91,11 +92,18 @@ export const getHomeContent = cache((): Promise<HomeContent> =>
         banner2_alt: data.banner2_alt || DEFAULT_HOME_CONTENT.banner2_alt,
         promo_text: data.promo_text || DEFAULT_HOME_CONTENT.promo_text,
         // 0 is a valid value (timer off) — only fall back when the column is
-        // missing (migration 007 not yet applied).
+        // missing (migration 007 not yet applied). Decimal values (numeric in
+        // Postgres) come back as JS numbers, so the same check covers them.
         welcome_redirect_seconds:
           typeof data.welcome_redirect_seconds === "number"
             ? data.welcome_redirect_seconds
             : DEFAULT_HOME_CONTENT.welcome_redirect_seconds,
+        // Only fall back when the column is missing (migration 008 not yet
+        // applied) — false is a valid stored value.
+        welcome_enabled:
+          typeof data.welcome_enabled === "boolean"
+            ? data.welcome_enabled
+            : DEFAULT_HOME_CONTENT.welcome_enabled,
       };
     } catch {
       return DEFAULT_HOME_CONTENT;
