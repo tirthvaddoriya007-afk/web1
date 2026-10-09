@@ -1,9 +1,9 @@
 import { SBlock, ProductGridSkeleton } from "@/components/StoreSkeleton";
 
 /**
- * Product-page skeleton: image slider → title/price → details table →
- * ratings & reviews → trust strip → "Products For You" grid, with the fixed
- * bottom action bar. Mirrors the real page's section order and shapes.
+ * Product-page skeleton: image slider → title/price → size + offers → details
+ * table → ratings & reviews → trust strip → "Products For You" grid, with the
+ * fixed bottom action bar. Mirrors the real page's section order and shapes.
  */
 export default function Loading() {
   return (
@@ -38,7 +38,7 @@ export default function Loading() {
         <SBlock className="h-3 w-20" />
       </div>
 
-      {/* Select Size + Sold by */}
+      {/* Select Size */}
       <div className="mt-2 bg-white px-4 py-4">
         <SBlock className="h-4 w-24" />
         <div className="mt-3 flex gap-2.5">
@@ -46,7 +46,22 @@ export default function Loading() {
             <SBlock key={i} className="h-9 w-14 rounded-lg" />
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
+      </div>
+
+      {/* Quantity offers — Buy 1 / Buy 2 / Buy 3 */}
+      <div className="mt-2 bg-white px-4 py-4">
+        <SBlock className="h-4 w-16" />
+        <div className="mt-3.5 grid grid-cols-3 gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SBlock key={i} className="h-[86px] rounded-xl" />
+          ))}
+        </div>
+        <SBlock className="mt-3 h-3 w-64" />
+      </div>
+
+      {/* Sold by */}
+      <div className="mt-2 bg-white px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex-1 space-y-2">
             <SBlock className="h-3 w-16" />
             <SBlock className="h-4 w-40" />

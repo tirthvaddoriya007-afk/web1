@@ -20,7 +20,7 @@ const LABELS: Record<Method, string> = {
 };
 
 export default function PaymentClient({ upi }: { upi: UpiConfig }) {
-  const { items, total, payable, address, placeOrder, ready } = useStore();
+  const { items, total, offerDiscount, promoDiscount, payable, address, placeOrder, ready } = useStore();
   const router = useRouter();
 
   // No UPI ID saved in the admin panel yet — COD is the only workable option.
@@ -90,13 +90,13 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   }, [popup]);
 
   /**
-   * Fire the deep link for the currently selected app — the exact same
-   * redirection as before (PhonePe collect screen for gpay/phonepe, Paytm
-   * cash-wallet for paytm). The spinner popup opens on the same tick so the
-   * user sees "Opening payment app..." while the OS switches apps.
+   * Fire the deep link for the given app — the exact same redirection as
+   * before (PhonePe collect screen for gpay/phonepe, Paytm cash-wallet for
+   * paytm). The spinner popup opens on the same tick so the user sees
+   * "Opening payment app..." while the OS switches apps.
    */
-  const handoff = () => {
-    const appLink = buildUpiLink({ config: upi, app: method as UpiApp, amount: payable });
+  const handoff = (app: Method) => {
+    const appLink = buildUpiLink({ config: upi, app: app as UpiApp, amount: payable });
 
     handedOff.current = true;
     setPlacing(true);
@@ -107,6 +107,21 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     } catch {
       /* no-op: the 2s fallback returns the user to the payment page */
     }
+  };
+
+  /**
+   * Tap-to-pay: selecting a DIFFERENT UPI option fires the hand-off to that
+   * app instantly — no Pay Now tap needed. Same-option taps only select, and
+   * COD (the no-UPI fallback) stays button-driven so an order is never placed
+   * by accident.
+   */
+  const selectMethod = (k: Method) => {
+    setMethod(k);
+    if (k === "cod" || !upiReady || k === method) return;
+    trackPixel("Purchase", { value: payable, currency: "INR" });
+    trackPayClick(k, payable);
+    snapshotFirstOrder();
+    handoff(k);
   };
 
   const pay = () => {
@@ -127,7 +142,7 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     // UPI: store a one-time snapshot of this first order (mirrors the
     // reference store's Ordered* keys), then hand off to the chosen app.
     snapshotFirstOrder();
-    handoff();
+    handoff(method);
   };
 
   // Mirrors the reference store: the first order ever placed is snapshotted
@@ -151,7 +166,7 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   const tryAgain = () => {
     // Same selected method and amount — restart the flow: spinner popup +
     // hand off to the same payment app again.
-    handoff();
+    handoff(method);
   };
 
   const cancel = () => {
@@ -221,11 +236,11 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#777" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
               </div>
 
-              <UpiRow k="gpay" label="G Pay" method={method} set={setMethod} logo={<GPayLogo />} />
-              <UpiRow k="phonepe" label="PhonePe" method={method} set={setMethod}
+              <UpiRow k="gpay" label="G Pay" method={method} set={selectMethod} logo={<GPayLogo />} />
+              <UpiRow k="phonepe" label="PhonePe" method={method} set={selectMethod}
                 note={<span className="text-[11px] text-[red]">25% Cashback in 24 hour</span>}
                 logo={<PhonePeLogo />} labelColor="green" />
-              <UpiRow k="paytm" label="Paytm" method={method} set={setMethod}
+              <UpiRow k="paytm" label="Paytm" method={method} set={selectMethod}
                 note={<span className="text-[11px] text-[green]">20% Cashback in 24 hour</span>}
                 logo={<PaytmLogo />} />
             </div>
@@ -236,7 +251,7 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
             screen only ever shows the UPI list. */}
         {!upiReady && (
           <div className="px-4">
-            <UpiRow k="cod" label="Cash on Delivery" method={method} set={setMethod}
+            <UpiRow k="cod" label="Cash on Delivery" method={method} set={selectMethod}
               note={<span className="text-[11px] text-[#9b9b9b]">Pay when your order arrives</span>} />
           </div>
         )}
@@ -252,6 +267,12 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
           <span>Total Product Price:</span>
           <span className="font-semibold">{formatPrice(total)}</span>
         </div>
+        {(offerDiscount > 0 || promoDiscount > 0) && (
+          <div className="flex justify-between text-[14px] py-1.5 text-[#1ba672]">
+            <span>Offers applied:</span>
+            <span className="font-semibold">- {formatPrice(offerDiscount + promoDiscount)}</span>
+          </div>
+        )}
         {/* solid grey separator here (the cart's dashed rule is a different div) */}
         <div className="h-px bg-[#eaeaf2] mt-3 mb-1" />
         <div className="flex justify-between text-[15px] font-bold py-3">

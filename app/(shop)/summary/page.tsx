@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
-import { useStore } from "@/lib/store";
+import { useStore, offerUnitPrice } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
 
@@ -57,8 +57,13 @@ function SummaryInner() {
               <p className="text-[12px] text-[#7e808c] mt-1">
                 Qty {i.qty}
                 {i.size ? ` · Size ${i.size}` : ""} ·{" "}
-                <span className="font-semibold text-[#1a2024]">{formatPrice(i.price)}</span>
+                <span className="font-semibold text-[#1a2024]">{formatPrice(offerUnitPrice(i.price, i.offer))}</span>
               </p>
+              {i.offer && (
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-[#eafaf3] px-1.5 py-0.5 text-[11px] font-bold text-[#038d63]">
+                  Buy {i.offer.qty} · {i.offer.discountPct}% OFF
+                </span>
+              )}
             </div>
           </div>
         ))}
