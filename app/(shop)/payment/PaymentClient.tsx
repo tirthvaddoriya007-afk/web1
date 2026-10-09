@@ -20,7 +20,7 @@ const LABELS: Record<Method, string> = {
 };
 
 export default function PaymentClient({ upi }: { upi: UpiConfig }) {
-  const { items, total, offerDiscount, promoDiscount, payable, address, placeOrder, ready } = useStore();
+  const { items, total, comboDiscount, payable, address, placeOrder, ready } = useStore();
   const router = useRouter();
 
   // No UPI ID saved in the admin panel yet — COD is the only workable option.
@@ -267,10 +267,10 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
           <span>Total Product Price:</span>
           <span className="font-semibold">{formatPrice(total)}</span>
         </div>
-        {(offerDiscount > 0 || promoDiscount > 0) && (
+        {comboDiscount > 0 && (
           <div className="flex justify-between text-[14px] py-1.5 text-[#1ba672]">
             <span>Offers applied:</span>
-            <span className="font-semibold">- {formatPrice(offerDiscount + promoDiscount)}</span>
+            <span className="font-semibold">- {formatPrice(comboDiscount)}</span>
           </div>
         )}
         {/* solid grey separator here (the cart's dashed rule is a different div) */}

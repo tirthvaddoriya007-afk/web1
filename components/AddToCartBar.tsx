@@ -1,31 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { CartOffer, Product } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import { useStore } from "@/lib/store";
 
-export default function AddToCartBar({
-  product,
-  size,
-  offer,
-}: {
-  product: Product;
-  size: string;
-  offer: CartOffer | null;
-}) {
+export default function AddToCartBar({ product, size }: { product: Product; size: string }) {
   const { addItem, openCart } = useStore();
   const router = useRouter();
 
-  // Combo chips add their whole pack at once (Buy 2 → 2 units at 20% off).
-  const qty = offer ? offer.qty : 1;
-
   const add = () => {
-    addItem(product, qty, size, offer);
+    addItem(product, 1, size);
     openCart();
   };
 
   const buyNow = () => {
-    addItem(product, qty, size, offer);
+    addItem(product, 1, size);
     router.push("/cart");
   };
 

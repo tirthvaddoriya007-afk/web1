@@ -33,14 +33,6 @@ export interface Category {
   count?: number;
 }
 
-/** Quantity offer selected on the PDP — e.g. Buy 2 Get 20% OFF. */
-export interface CartOffer {
-  /** Units the offer is sold as (2 or 3). */
-  qty: number;
-  /** Discount applied to every unit of this cart line (20 or 30). */
-  discountPct: number;
-}
-
 export interface CartItem {
   hash: string;
   name: string;
@@ -50,8 +42,6 @@ export interface CartItem {
   qty: number;
   /** Selected size (S/M/L/XL/XXL/XXXL) — optional so older saved carts still load. */
   size?: string;
-  /** PDP offer chip applied to this line; null = regular single buy. */
-  offer?: CartOffer | null;
 }
 
 export interface Address {

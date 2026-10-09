@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useStore, offerUnitPrice } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 
 const STEPS = ["Confirmed", "Packed", "Shipped", "Out for Delivery", "Delivered"];
@@ -91,10 +91,7 @@ export default function OrderTrackingPage() {
                         <p className="text-[13px] line-clamp-2">{i.name}</p>
                         <p className="text-[12px] text-[#7e808c] mt-0.5">
                           Qty {i.qty}
-                          {i.size ? ` · Size ${i.size}` : ""} · {formatPrice(offerUnitPrice(i.price, i.offer))}
-                          {i.offer && (
-                            <span className="ml-1.5 font-bold text-[#038d63]">{i.offer.discountPct}% OFF</span>
-                          )}
+                          {i.size ? ` · Size ${i.size}` : ""} · {formatPrice(i.price)}
                         </p>
                       </div>
                     </div>

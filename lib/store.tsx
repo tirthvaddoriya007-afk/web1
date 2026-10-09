@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import type { CartItem, CartOffer, Product, Address, Order } from "./types";
+import type { CartItem, Product, Address, Order } from "./types";
 
 const CART_KEY = "products"; // same key name the reference app used
 const ADDR_KEY = "address";
@@ -12,11 +12,9 @@ interface StoreCtx {
   count: number;
   total: number;
   mrpTotal: number;
-  promoDiscount: number;
-  offerDiscount: number;
-  freeCount: number;
+  comboDiscount: number;
   payable: number;
-  addItem: (p: Product, qty?: number, size?: string, offer?: CartOffer | null) => void;
+  addItem: (p: Product, qty?: number, size?: string) => void;
   removeItem: (hash: string, size?: string) => void;
   setQty: (hash: string, size: string | undefined, qty: number) => void;
   clear: () => void;
@@ -51,10 +49,15 @@ function write(key: string, value: unknown) {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Effective unit price after a PDP offer chip (discount % off every unit). */
-export function offerUnitPrice(price: number, offer?: CartOffer | null): number {
-  if (!offer) return price;
-  return round2(price * (1 - offer.discountPct / 100));
+/**
+ * Whole-cart combo ladder: total units across ALL products decide one flat %
+ * off the cart total — 1 → 0%, 2 → 10%, 3 → 20%, 4+ → 30% (capped).
+ */
+export function tierPct(count: number): number {
+  if (count >= 4) return 30;
+  if (count === 3) return 20;
+  if (count === 2) return 10;
+  return 0;
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -75,29 +78,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (ready) write(CART_KEY, items);
   }, [items, ready]);
 
-  const addItem = useCallback((p: Product, qty = 1, size?: string, offer?: CartOffer | null) => {
+  const addItem = useCallback((p: Product, qty = 1, size?: string) => {
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.hash === p.hash && (i.size ?? "") === (size ?? ""));
       if (idx >= 0) {
         const next = [...prev];
-        const cur = next[idx];
-        if (offer) {
-          // Same offer re-tapped → stack more units. Different offer (or the
-          // line had none) → the line becomes the newly chosen combo.
-          if (cur.offer?.qty === offer.qty && cur.offer?.discountPct === offer.discountPct) {
-            next[idx] = { ...cur, qty: cur.qty + qty };
-          } else {
-            next[idx] = { ...cur, qty, offer };
-          }
-        } else {
-          // Regular single add — never strips an offer the line already has.
-          next[idx] = { ...cur, qty: cur.qty + qty };
-        }
+        next[idx] = { ...next[idx], qty: next[idx].qty + qty };
         return next;
       }
       return [
         ...prev,
-        { hash: p.hash, name: p.name, price: p.price, mrp: p.mrp, image: p.image, qty, size, offer: offer ?? null },
+        { hash: p.hash, name: p.name, price: p.price, mrp: p.mrp, image: p.image, qty, size },
       ];
     });
   }, []);
@@ -123,28 +114,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     write(ADDR_KEY, a);
   }, []);
 
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const mrpTotal = items.reduce((s, i) => s + i.mrp * i.qty, 0);
+  const count = items.reduce((s, i) => s + i.qty, 0);
+  // Whole-cart combo: one flat % off the cart total based on total units.
+  const comboDiscount = round2((total * tierPct(count)) / 100);
+
   const placeOrder = useCallback(
     (paymentMode: string): Order | null => {
       if (items.length === 0 || !address) return null;
-      const gross = items.reduce((s, i) => s + i.price * i.qty, 0);
-      const offerDisc = items.reduce(
-        (s, i) => s + (i.offer ? (i.price - offerUnitPrice(i.price, i.offer)) * i.qty : 0),
-        0
-      );
-      // Buy 2 Get 1 Free: only regular lines join the pool — combo-offer
-      // lines are already discounted and never stack with the freebie.
-      const u: number[] = [];
-      items.forEach((i) => {
-        if (!i.offer) for (let k = 0; k < i.qty; k++) u.push(i.price);
-      });
-      u.sort((a, b) => b - a);
-      let promo = 0;
-      for (let i = 2; i < u.length; i += 3) promo += u[i];
-      const total = round2(gross - offerDisc - promo);
+      const orderTotal = round2(total - comboDiscount);
       const order: Order = {
         id: "OD" + Date.now().toString().slice(-10),
         items: [...items],
-        total,
+        total: orderTotal,
         address,
         paymentMode,
         status: "Confirmed",
@@ -156,31 +139,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setItems([]);
       return order;
     },
-    [items, address, orders]
+    [items, total, comboDiscount, address, orders]
   );
 
-  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const mrpTotal = items.reduce((s, i) => s + i.mrp * i.qty, 0);
-  const count = items.reduce((s, i) => s + i.qty, 0);
-  const offerDiscount = items.reduce(
-    (s, i) => s + (i.offer ? (i.price - offerUnitPrice(i.price, i.offer)) * i.qty : 0),
-    0
-  );
-
-  // Buy 2 Get 1 Free: for every group of 3 units, the cheapest one is free.
-  // Lines bought under a PDP combo offer are excluded (already discounted).
-  const units: number[] = [];
-  items.forEach((i) => { if (!i.offer) for (let k = 0; k < i.qty; k++) units.push(i.price); });
-  units.sort((a, b) => b - a); // most expensive first
-  let promoDiscount = 0;
-  let freeCount = 0;
-  for (let i = 2; i < units.length; i += 3) { promoDiscount += units[i]; freeCount++; }
-  const payable = round2(total - offerDiscount - promoDiscount);
+  const payable = round2(total - comboDiscount);
 
   return (
     <Ctx.Provider
       value={{
-        items, count, total, mrpTotal, promoDiscount, offerDiscount, freeCount, payable,
+        items, count, total, mrpTotal, comboDiscount, payable,
         addItem, removeItem, setQty, clear,
         address, saveAddress, orders, placeOrder, ready,
         cartOpen,

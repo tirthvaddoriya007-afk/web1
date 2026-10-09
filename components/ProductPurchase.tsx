@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import type { CartOffer, Product } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import AddToCartBar from "./AddToCartBar";
-import OfferSelector from "./OfferSelector";
+import OfferBanner from "./OfferBanner";
 
 const SIZES = ["S", "M", "L", "XL", "XXL", "XXXL"];
 
 /**
- * Select Size + quantity offers + Sold-by + sticky buy bar. One client
- * component so the chosen size and offer chip are shared between the pills
- * and the Add to Cart / Buy Now buttons.
+ * Select Size + combo offers + Sold-by + sticky buy bar. One client component
+ * so the chosen size is shared between the pills and the Add to Cart / Buy Now
+ * buttons. The offer banner is read-only — the cart applies the discount
+ * automatically based on the total number of items.
  */
 export default function ProductPurchase({ product }: { product: Product }) {
   const [size, setSize] = useState("S");
-  const [offer, setOffer] = useState<CartOffer | null>(null);
 
   return (
     <>
@@ -47,8 +47,8 @@ export default function ProductPurchase({ product }: { product: Product }) {
         </div>
       </div>
 
-      {/* Quantity offers — Buy 1 / Buy 2 · 20% OFF / Buy 3 · 30% OFF */}
-      <OfferSelector price={product.price} value={offer} onChange={setOffer} />
+      {/* Combo offers — read-only banner, cart applies the discount itself */}
+      <OfferBanner />
 
       {/* Sold by — hardcoded store card, View Shop has no behaviour yet */}
       <div className="bg-white mt-2 px-4 py-4">
@@ -78,7 +78,7 @@ export default function ProductPurchase({ product }: { product: Product }) {
         </div>
       </div>
 
-      <AddToCartBar product={product} size={size} offer={offer} />
+      <AddToCartBar product={product} size={size} />
     </>
   );
 }

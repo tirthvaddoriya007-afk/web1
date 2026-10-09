@@ -48,12 +48,12 @@ export default function Loading() {
         </div>
       </div>
 
-      {/* Quantity offers — Buy 1 / Buy 2 / Buy 3 */}
+      {/* Combo offers — Buy Any 2 / 3 / 4 */}
       <div className="mt-2 bg-white px-4 py-4">
         <SBlock className="h-4 w-16" />
         <div className="mt-3.5 grid grid-cols-3 gap-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <SBlock key={i} className="h-[86px] rounded-xl" />
+            <SBlock key={i} className="h-[74px] rounded-xl" />
           ))}
         </div>
         <SBlock className="mt-3 h-3 w-64" />
