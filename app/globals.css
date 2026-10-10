@@ -501,11 +501,11 @@ body {
 .drawer {
   position: fixed;
   top: 0;
+  bottom: 0;
   right: 50%;
   transform: translateX(50%);
   width: 100%;
   max-width: var(--app-width);
-  height: 100vh;
   background: #fff;
   z-index: 61;
   display: flex;

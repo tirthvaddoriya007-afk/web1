@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useStore, tierPct } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
@@ -7,6 +8,14 @@ import { formatPrice } from "@/lib/data";
 export default function CartDrawer({ onClose }: { onClose: () => void }) {
   const { items, count, total, comboDiscount, payable, setQty, removeItem } = useStore();
   const pct = tierPct(count);
+
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
 
   return (
     <>
@@ -24,7 +33,7 @@ export default function CartDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto border-t">
+        <div className="flex-1 overflow-y-auto overscroll-contain border-t">
           {items.length === 0 ? (
             <div className="text-center py-24 text-[#1a2024] font-semibold">
               Your cart is feeling lonely
@@ -64,7 +73,10 @@ export default function CartDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer */}
-        <div className="border-t px-4 pt-3 pb-4">
+        <div
+          className="border-t px-4 pt-3 pb-4"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
           {count > 0 && (
             pct > 0 ? (
               <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-[#eafaf3] px-2.5 py-2 text-[12px] font-bold text-[#038d63]">
