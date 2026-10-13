@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * Loads Meta's pixel with the ID configured in the admin panel (Supabase
- * `settings.meta_pixel_id`), fetched via /api/pixel-config so a change at
- * /admin takes effect without a redeploy. An empty ID disables the pixel.
+ * `settings.meta_pixel_id`), read directly from Supabase — no Vercel API
+ * route involved. An empty ID disables the pixel.
  *
  * The snippet is idempotent (if fbq already exists it does nothing), so
  * rendering this component on several pages during SPA navigation is safe.
@@ -19,10 +20,14 @@ export default function MetaPixel({ pageView = false }: { pageView?: boolean }) 
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/pixel-config")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { pixelId?: string } | null) => {
-        if (!cancelled && d?.pixelId) setPixelId(d.pixelId);
+    const query = createClient()
+      .from("settings")
+      .select("meta_pixel_id")
+      .eq("id", 1)
+      .maybeSingle();
+    Promise.resolve(query)
+      .then(({ data }) => {
+        if (!cancelled && data?.meta_pixel_id) setPixelId(data.meta_pixel_id);
       })
       .catch(() => {
         /* pixel stays disabled */

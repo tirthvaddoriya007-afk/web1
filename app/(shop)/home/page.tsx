@@ -5,10 +5,9 @@ import Banner from "@/components/Banner";
 import MetaPixel from "@/components/MetaPixel";
 import { getProductPage, getHomeContent } from "@/lib/catalog";
 
-// Live content: banners, promo line and the product feed all come from
-// Supabase through the 10s SWR cache — admin edits are pushed live instantly
-// via /api/revalidate, so visitors never wait on the database.
-export const dynamic = "force-dynamic";
+// ISR: rendered once, served from the CDN for 60s. Admin saves purge the
+// cache instantly via /api/revalidate, so visitors never wait on the database.
+export const revalidate = 60;
 
 export default async function HomePage() {
   // First page comes from Supabase at render time, so the grid is in the HTML

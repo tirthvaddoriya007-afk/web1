@@ -48,19 +48,4 @@ export const getUpiConfig = cache((): Promise<UpiConfig> =>
   })
 );
 
-/** Meta Pixel ID from the admin settings row. Empty string disables the pixel. */
-export const getMetaPixelId = cache((): Promise<string> =>
-  cachedSettings(["pixel-id"], async () => {
-    try {
-      const { data } = await settingsClient
-        .from("settings")
-        .select("meta_pixel_id")
-        .eq("id", 1)
-        .maybeSingle();
-
-      return data?.meta_pixel_id || "";
-    } catch {
-      return "";
-    }
-  })
-);
+/** Meta Pixel ID — read client-side by MetaPixel straight from Supabase. */

@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { PAGE_SIZE } from "@/lib/paging";
+import { PRODUCT_COLUMNS } from "@/lib/productColumns";
 import type { Product } from "@/lib/types";
 import ProductCard from "./ProductCard";
 import ProductCardOffer from "./ProductCardOffer";
@@ -9,7 +12,8 @@ import { ProductGridSkeleton } from "./StoreSkeleton";
 /**
  * The first page is rendered on the server and handed in, so the grid is
  * painted with the HTML — no spinner on first view or when returning from a
- * product page. Only pages 2+ are fetched, as the user scrolls.
+ * product page. Pages 2+ are fetched directly from Supabase as the user
+ * scrolls — no Vercel API route involved.
  */
 export default function ProductFeed({
   initialItems,
@@ -27,10 +31,14 @@ export default function ProductFeed({
   const fetchPage = useCallback(async (p: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/products?page=${p}`);
-      const data = await res.json();
-      setItems((prev) => [...prev, ...(data.products as Product[])]);
-      setTotalPage(data.total_page);
+      const start = (p - 1) * PAGE_SIZE;
+      const { data, count } = await createClient()
+        .from("products")
+        .select(PRODUCT_COLUMNS, { count: "exact" })
+        .order("order_number")
+        .range(start, start + PAGE_SIZE - 1);
+      setItems((prev) => [...prev, ...((data as Product[]) ?? [])]);
+      setTotalPage(Math.max(1, Math.ceil((count ?? PAGE_SIZE) / PAGE_SIZE)));
       setPage(p);
     } finally {
       setLoading(false);

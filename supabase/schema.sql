@@ -97,10 +97,11 @@ create policy settings_admin_update on public.settings
 
 -- ---------------------------------------------------------------------------
 -- 4. PAGE VIEWS — anonymous storefront traffic analytics.
---    One row per page view, written by /api/track. `visitor_id` is a random
---    UUID stored in the visitor's browser cookie, so unique visitors can be
---    counted without storing anything personal. Days are grouped in India
---    time (Asia/Kolkata) because that is where the storefront operates.
+--    One row per page view, inserted by PageViewTracker straight from the
+--    browser to Supabase (anon insert). `visitor_id` is a random UUID stored
+--    in the visitor's localStorage, so unique visitors can be counted without
+--    storing anything personal. Days are grouped in India time (Asia/Kolkata)
+--    because that is where the storefront operates.
 -- ---------------------------------------------------------------------------
 create table if not exists public.page_views (
   id           bigint generated always as identity primary key,
@@ -216,9 +217,10 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- 5. PAY CLICKS — one row every time a visitor taps the payment page's
---    Pay Now / Place Order button. Written by /api/pay-click. Lets the admin
---    see exactly how many people reached the final checkout step and which
---    payment method they chose.
+--    Pay Now / Place Order button. Inserted by lib/payclick.ts straight from
+--    the browser to Supabase (anon insert). Lets the admin see exactly how
+--    many people reached the final checkout step and which payment method
+--    they chose.
 -- ---------------------------------------------------------------------------
 create table if not exists public.pay_clicks (
   id         bigint generated always as identity primary key,
@@ -277,9 +279,10 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. WELCOME TAPS — one row every time a visitor taps anywhere on the welcome
---    landing (each tap sends them to /home). Written by /api/welcome-click.
---    Lets the admin see how many visitors actually tap through, separately
---    from the auto-redirect timer.
+--    landing (each tap sends them to /home). Inserted by lib/welcomeclick.ts
+--    straight from the browser to Supabase (anon insert). Lets the admin see
+--    how many visitors actually tap through, separately from the auto-redirect
+--    timer.
 -- ---------------------------------------------------------------------------
 create table if not exists public.welcome_clicks (
   id         bigint generated always as identity primary key,

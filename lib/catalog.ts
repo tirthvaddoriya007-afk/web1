@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import categoriesData from "@/data/categories.json";
 import { PAGE_SIZE } from "./paging";
+import { PRODUCT_COLUMNS } from "./productColumns";
 import type { Product, Category, Review, HomeContent } from "./types";
 
 // =============================================================================
@@ -15,9 +16,6 @@ import type { Product, Category, Review, HomeContent } from "./types";
 // is also wrapped in React cache() so duplicate calls inside one request
 // (generateMetadata pass + page pass) collapse into a single query.
 // =============================================================================
-
-const PRODUCT_COLUMNS =
-  "id, hash, name, price, mrp, off, image, images, badge, categories, category, order_number, fabric, color, pattern, fit_shape, additional_info";
 
 const catalogClient = createSupabaseClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -257,24 +255,6 @@ export const getCategorySamples = cache(
       }
     })
 );
-
-export const searchProducts = cache((q: string, limit = 80): Promise<Product[]> => {
-  const s = q.trim();
-  if (!s) return Promise.resolve([]);
-  return cachedQuery(["search", s.toLowerCase(), String(limit)], async () => {
-    try {
-      const { data } = await catalogClient
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .ilike("name", `%${s}%`)
-        .order("order_number")
-        .limit(limit);
-      return (data as Product[]) ?? [];
-    } catch {
-      return [];
-    }
-  });
-});
 
 export const getReviews = cache((): Promise<Review[]> =>
   cachedQuery(["reviews"], async () => {

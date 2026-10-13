@@ -2,9 +2,24 @@ import { notFound } from "next/navigation";
 import ProductCardOffer from "@/components/ProductCardOffer";
 import { getCategories, getProductsByCategory } from "@/lib/catalog";
 
-// Live catalogue — served through the 10s SWR cache; category edits go live
+// ISR: rendered once, served from the CDN for 60s. Category edits go live
 // instantly via /api/revalidate.
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
+// Category pages are pre-rendered at build time (both the slug and the
+// legacy orig_slug variants) so crawlers hit static CDN files. New categories
+// added later still work through on-demand ISR.
+export async function generateStaticParams() {
+  try {
+    const cats = await getCategories();
+    return cats.flatMap((c) => [
+      { slug: c.slug },
+      ...(c.origSlug && c.origSlug !== c.slug ? [{ slug: c.origSlug }] : []),
+    ]);
+  } catch {
+    return [];
+  }
+}
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const cats = await getCategories();

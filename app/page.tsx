@@ -9,9 +9,9 @@ export const metadata: Metadata = {
   description: `${brand.name} — mega sale is live. Continue to shopping and grab today's deals.`,
 };
 
-// Live product data (the catalogue row for this card comes from Supabase,
-// served through the 10s SWR cache with instant admin invalidation).
-export const dynamic = "force-dynamic";
+// ISR: rendered once, served from the CDN for 60s. Admin saves purge the
+// cache instantly via /api/revalidate, so shoppers never wait on Supabase.
+export const revalidate = 60;
 
 // Welcome landing (the reference's index.php equivalent). Lives outside the
 // (shop) group on purpose: this page is chromeless — no header, no bottom

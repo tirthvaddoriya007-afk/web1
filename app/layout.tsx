@@ -25,13 +25,36 @@ export const viewport: Viewport = {
   themeColor: brand.colors.primary,
 };
 
+// Phone-only gate, client-side. Runs before first paint so desktop/tablet
+// visitors see the loader immediately — same UX as the old middleware
+// rewrite, but it costs Vercel zero edge invocations (middleware now only
+// guards /admin). Crawlers and bots are exempt, so SEO/link previews still
+// see the real storefront. Mirrors lib/ua.ts isPhone/isCrawler exactly.
+const deviceGate = `
+(function () {
+  var path = location.pathname;
+  if (path === "/mobile-only" || path.indexOf("/admin") === 0) return;
+  var ua = navigator.userAgent || "";
+  if (/bot|crawl|spider|slurp|preview|headless|phantom|lighthouse|pingdom|uptime|bytespider|gptbot|semrush|ahrefs|facebookexternalhit|metaexternalagent|whatsapp|telegram|pinterest|linkedin|discord|viber/i.test(ua)) return;
+  var s = ua.toLowerCase();
+  if (/ipad|macintosh|tablet/i.test(s)) { location.replace("/mobile-only"); return; }
+  if (!/iphone|ipod|android[\\s\\S]*?mobile|windows phone|iemobile|blackberry|opera mini|webos/i.test(s)) {
+    location.replace("/mobile-only");
+  }
+})();
+`;
+
 // Root layout is intentionally bare: the storefront chrome lives in
 // app/(shop)/layout.tsx and the admin panel has its own shell, so /admin
 // does not inherit the header, bottom nav or cart drawer.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-IN" className={appFont.variable}>
-      <body>{children}</body>
+      <body>
+        {/* First element in <body>: runs synchronously before any paint. */}
+        <script dangerouslySetInnerHTML={{ __html: deviceGate }} />
+        {children}
+      </body>
     </html>
   );
 }

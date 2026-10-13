@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { formatPrice, specialOffer, seededRandom } from "@/lib/data";
-import { getProductByHash } from "@/lib/catalog";
+import { getProductByHash, getAllProducts } from "@/lib/catalog";
 import { buildRatings } from "@/lib/reviews";
 import ProductPurchase from "@/components/ProductPurchase";
 import ProductImageSlider from "@/components/ProductImageSlider";
@@ -11,12 +11,24 @@ import TrustedLogo from "@/components/TrustedLogo";
 import ReviewsSection from "./ReviewsSection";
 import ForYouSection from "./ForYouSection";
 
-// Live product data — served through the 60s SWR cache, so admin edits (price,
+// ISR: rendered once, served from the CDN for 60s. Admin edits (price,
 // images, position) are visible instantly via /api/revalidate while shoppers
 // never wait on the database. The shell below only depends on the single
 // product query; reviews and "Products For You" stream in afterwards, so the
 // hero, price and buy bar appear as fast as possible.
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
+
+// Every product page is pre-rendered at build time, so bots crawling the
+// catalogue hit static CDN files instead of server functions. Falls back to
+// on-demand ISR for products added after the last build.
+export async function generateStaticParams() {
+  try {
+    const products = await getAllProducts();
+    return products.map((p) => ({ hash: p.hash }));
+  } catch {
+    return [];
+  }
+}
 
 export async function generateMetadata({ params }: { params: { hash: string } }) {
   const p = await getProductByHash(params.hash);

@@ -4,9 +4,9 @@ import SearchBar from "@/components/SearchBar";
 
 export const metadata = { title: "Categories" };
 
-// Live catalogue — served through the 10s SWR cache; admin edits go live
+// ISR: rendered once, served from the CDN for 60s. Admin edits go live
 // instantly via /api/revalidate, with no cache or rebuild.
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function CategoriesPage() {
   const [cats, samples] = await Promise.all([getCategories(), getCategorySamples()]);
