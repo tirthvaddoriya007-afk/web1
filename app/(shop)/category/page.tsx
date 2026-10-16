@@ -4,9 +4,9 @@ import SearchBar from "@/components/SearchBar";
 
 export const metadata = { title: "Categories" };
 
-// ISR: rendered once, served from the CDN for 60s. Admin edits go live
+// ISR: rendered once, served from the CDN for 1 hour. Admin edits go live
 // instantly via /api/revalidate, with no cache or rebuild.
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export default async function CategoriesPage() {
   const [cats, samples] = await Promise.all([getCategories(), getCategorySamples()]);

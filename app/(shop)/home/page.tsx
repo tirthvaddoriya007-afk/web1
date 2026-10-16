@@ -2,12 +2,11 @@ import Marquee from "@/components/Marquee";
 import DealsBar from "@/components/DealsBar";
 import ProductFeed from "@/components/ProductFeed";
 import Banner from "@/components/Banner";
-import MetaPixel from "@/components/MetaPixel";
 import { getProductPage, getHomeContent } from "@/lib/catalog";
 
-// ISR: rendered once, served from the CDN for 60s. Admin saves purge the
+// ISR: rendered once, served from the CDN for 1 hour. Admin saves purge the
 // cache instantly via /api/revalidate, so visitors never wait on the database.
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export default async function HomePage() {
   // First page comes from Supabase at render time, so the grid is in the HTML
@@ -49,9 +48,6 @@ export default async function HomePage() {
 
       {/* Product feed */}
       <ProductFeed initialItems={first.products} initialTotalPage={first.total_page} />
-
-      {/* Meta Pixel — PageView fires automatically on home page load */}
-      <MetaPixel pageView />
     </>
   );
 }

@@ -10,7 +10,7 @@ export default async function AdminSettingsPage() {
   const supabase = createClient();
   const { data } = await supabase
     .from("settings")
-    .select("upi_vpa, upi_payee_name, upi_merchant_code, meta_pixel_id")
+    .select("upi_vpa, upi_payee_name, upi_merchant_code")
     .eq("id", 1)
     .maybeSingle();
 
@@ -30,7 +30,6 @@ export default async function AdminSettingsPage() {
               upi_vpa: data?.upi_vpa ?? "",
               upi_payee_name: data?.upi_payee_name ?? "",
               upi_merchant_code: data?.upi_merchant_code ?? "",
-              meta_pixel_id: data?.meta_pixel_id ?? "",
             }}
           />
         </div>

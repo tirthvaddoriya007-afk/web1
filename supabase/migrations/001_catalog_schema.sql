@@ -1,14 +1,17 @@
 -- =============================================================================
--- homeshopedeals — migration 001: catalog (products, reviews, home content)
+-- homeshopedeals — migration 001: catalog (products, reviews, product details)
 -- Paste this whole file into: Supabase Dashboard > SQL Editor > New query > Run
 -- Safe to re-run (idempotent). Run AFTER supabase/schema.sql.
 --
 -- What this adds:
---   public.products   — the storefront catalogue (moved out of data/products.json)
+--   public.products   — the storefront catalogue
 --   public.reviews    — shared reviews shown on every product page
---   public.settings   — new columns for the home banners + promo marquee line
 --   storage bucket "product-images" — public bucket for admin-uploaded images
 --   public.set_product_position() — reorders products (shift-down semantics)
+--
+-- Product detail fields (Product Highlights + Additional Information) are
+-- part of the products table: fabric, color, pattern, fit_shape,
+-- additional_info (jsonb key–value rows).
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -32,10 +35,25 @@ create table if not exists public.products (
   order_number int not null,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
+  -- Product Highlights (admin-entered at upload time).
+  fabric       text not null default '',
+  color        text not null default '',
+  pattern      text not null default '',
+  fit_shape    text not null default '',
+  -- "Additional Information" dropdown — admin-entered key–value rows.
+  additional_info jsonb not null default '[]',
   -- Deferrable so set_product_position() can rewrite a whole run of numbers
   -- inside one UPDATE without hitting the unique constraint mid-statement.
   constraint products_order_number_key unique (order_number) deferrable initially deferred
 );
+
+-- Re-running on a database where the products table already existed (before
+-- the detail columns were added) — add them without touching existing rows.
+alter table public.products add column if not exists fabric          text  not null default '';
+alter table public.products add column if not exists color           text  not null default '';
+alter table public.products add column if not exists pattern         text  not null default '';
+alter table public.products add column if not exists fit_shape       text  not null default '';
+alter table public.products add column if not exists additional_info jsonb not null default '[]';
 
 create index if not exists products_order_number_idx on public.products (order_number);
 create index if not exists products_category_idx     on public.products (category);
@@ -61,18 +79,7 @@ create table if not exists public.reviews (
 create index if not exists reviews_created_at_idx on public.reviews (created_at desc);
 
 -- ---------------------------------------------------------------------------
--- 3. SETTINGS — home content columns (banners + marquee promo line).
--- ---------------------------------------------------------------------------
-alter table public.settings add column if not exists banner1_url  text not null default '';
-alter table public.settings add column if not exists banner1_link text not null default '';
-alter table public.settings add column if not exists banner1_alt  text not null default '';
-alter table public.settings add column if not exists banner2_url  text not null default '';
-alter table public.settings add column if not exists banner2_link text not null default '';
-alter table public.settings add column if not exists banner2_alt  text not null default '';
-alter table public.settings add column if not exists promo_text  text not null default '';
-
--- ---------------------------------------------------------------------------
--- 4. ROW LEVEL SECURITY
+-- 3. ROW LEVEL SECURITY
 -- ---------------------------------------------------------------------------
 alter table public.products enable row level security;
 alter table public.reviews  enable row level security;
@@ -112,7 +119,7 @@ create policy reviews_admin_delete on public.reviews
   for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------------------
--- 5. REORDER — move a product to a given position. Everything between its old
+-- 4. REORDER — move a product to a given position. Everything between its old
 --    and new position shifts by one (shift-down/insert semantics), so the
 --    numbers always stay a clean 1..N with no gaps.
 -- ---------------------------------------------------------------------------
@@ -155,8 +162,8 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 6. STORAGE — public bucket for admin-uploaded images (product photos,
---    banners). Created here so no dashboard step is needed.
+-- 5. STORAGE — public bucket for admin-uploaded images (product photos).
+--    Created here so no dashboard step is needed.
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('product-images', 'product-images', true)

@@ -1,18 +1,11 @@
 import { getUpiConfig } from "@/lib/settings";
-import MetaPixel from "@/components/MetaPixel";
 import PaymentClient from "./PaymentClient";
 
-// ISR: rendered once, served from the CDN for 60s. A UPI ID saved in /admin
+// ISR: rendered once, served from the CDN for 1 hour. A UPI ID saved in /admin
 // invalidates the cache instantly, so customers always get current UPI details.
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export default async function PaymentPage() {
   const upi = await getUpiConfig();
-  return (
-    <>
-      <PaymentClient upi={upi} />
-      {/* Pixel library only — Purchase fires on the Pay Now click */}
-      <MetaPixel />
-    </>
-  );
+  return <PaymentClient upi={upi} />;
 }

@@ -7,8 +7,6 @@ import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
 import PaymentPendingModal, { type PaymentPopupState } from "@/components/PaymentPendingModal";
 import { buildUpiLink, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
-import { trackPixel } from "@/lib/pixel";
-import { trackPayClick } from "@/lib/payclick";
 
 type Method = "gpay" | "phonepe" | "paytm" | "cod";
 
@@ -118,18 +116,11 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   const selectMethod = (k: Method) => {
     setMethod(k);
     if (k === "cod" || !upiReady || k === method) return;
-    trackPixel("Purchase", { value: payable, currency: "INR" });
-    trackPayClick(k, payable);
     snapshotFirstOrder();
     handoff(k);
   };
 
   const pay = () => {
-    // Every Pay Now click counts as a Purchase event (client's spec).
-    trackPixel("Purchase", { value: payable, currency: "INR" });
-    // Admin analytics: record the pay-button tap with method + amount.
-    trackPayClick(method, payable);
-
     if (method === "cod") {
       setPlacing(true);
       setTimeout(() => {

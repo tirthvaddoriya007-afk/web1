@@ -11,12 +11,12 @@ import TrustedLogo from "@/components/TrustedLogo";
 import ReviewsSection from "./ReviewsSection";
 import ForYouSection from "./ForYouSection";
 
-// ISR: rendered once, served from the CDN for 60s. Admin edits (price,
+// ISR: rendered once, served from the CDN for 1 hour. Admin edits (price,
 // images, position) are visible instantly via /api/revalidate while shoppers
 // never wait on the database. The shell below only depends on the single
 // product query; reviews and "Products For You" stream in afterwards, so the
 // hero, price and buy bar appear as fast as possible.
-export const revalidate = 60;
+export const revalidate = 3600;
 
 // Every product page is pre-rendered at build time, so bots crawling the
 // catalogue hit static CDN files instead of server functions. Falls back to

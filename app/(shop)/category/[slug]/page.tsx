@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import ProductCardOffer from "@/components/ProductCardOffer";
 import { getCategories, getProductsByCategory } from "@/lib/catalog";
 
-// ISR: rendered once, served from the CDN for 60s. Category edits go live
+// ISR: rendered once, served from the CDN for 1 hour. Category edits go live
 // instantly via /api/revalidate.
-export const revalidate = 60;
+export const revalidate = 3600;
 
 // Category pages are pre-rendered at build time (both the slug and the
 // legacy orig_slug variants) so crawlers hit static CDN files. New categories

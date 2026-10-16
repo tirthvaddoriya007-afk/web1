@@ -43,33 +43,12 @@ const NAV = [
     ),
   },
   {
-    href: "/admin/home-content",
-    label: "Home Content",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M3 11l9-7 9 7" />
-        <path d="M5 10v10h14V10" />
-        <path d="M9 20v-6h6v6" />
-      </svg>
-    ),
-  },
-  {
     href: "/admin/reviews",
     label: "Reviews",
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M21 12a8 8 0 1 1-4.5-7.2" />
         <path d="M21 4v4h-4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/admin/analytics",
-    label: "Analytics",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M3 21h18" />
-        <path d="M7 17v-5M12 17V7M17 17v-9" strokeLinecap="round" />
       </svg>
     ),
   },

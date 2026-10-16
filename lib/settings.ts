@@ -5,7 +5,7 @@ import { brand } from "@/lib/brand";
 import { emptyUpiConfig, type UpiConfig } from "@/lib/upi";
 
 /**
- * Site-wide settings reads (UPI + pixel ID). Cached 10s with the "settings"
+ * Site-wide settings reads (UPI). Cached 1 hour with the "settings"
  * tag — shopper pages don't wait on Supabase, and an admin save at /admin
  * triggers /api/revalidate (revalidateTag("settings")) so changes go live
  * immediately. Uses the anon key (public RLS read) instead of the cookie-based
@@ -18,9 +18,9 @@ const settingsClient = createSupabaseClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-/** Data-Cache wrapper: 10s SWR + "settings" tag for admin-triggered purges. */
+/** Data-Cache wrapper: 1 hour SWR + "settings" tag for admin-triggered purges. */
 function cachedSettings<T>(key: string[], fn: () => Promise<T>): Promise<T> {
-  return unstable_cache(fn, key, { revalidate: 10, tags: ["settings"] })();
+  return unstable_cache(fn, key, { revalidate: 3600, tags: ["settings"] })();
 }
 
 export const getUpiConfig = cache((): Promise<UpiConfig> =>
@@ -47,5 +47,3 @@ export const getUpiConfig = cache((): Promise<UpiConfig> =>
     }
   })
 );
-
-/** Meta Pixel ID — read client-side by MetaPixel straight from Supabase. */

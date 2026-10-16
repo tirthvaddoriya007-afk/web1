@@ -9,7 +9,7 @@ import type { Product, Category, Review, HomeContent } from "./types";
 // =============================================================================
 // Storefront catalogue — read-only Supabase access.
 //
-// Every read is cached in Next's Data Cache for 60 seconds (stale-while-
+// Every read is cached in Next's Data Cache for 1 hour (stale-while-
 // revalidate) and tagged "catalog": shopper pages render without waiting on
 // Supabase, and an admin save calls /api/revalidate (revalidateTag("catalog"))
 // so edits still go live instantly for the very next visitor. Each function
@@ -23,9 +23,9 @@ const catalogClient = createSupabaseClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-/** Data-Cache wrapper: 60s SWR + "catalog" tag for admin-triggered purges. */
+/** Data-Cache wrapper: 1 hour SWR + "catalog" tag for admin-triggered purges. */
 function cachedQuery<T>(key: string[], fn: () => Promise<T>): Promise<T> {
-  return unstable_cache(fn, key, { revalidate: 60, tags: ["catalog"] })();
+  return unstable_cache(fn, key, { revalidate: 3600, tags: ["catalog"] })();
 }
 
 const CATEGORY_COLUMNS = "id, slug, orig_slug, name";
@@ -65,49 +65,11 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
   banner2_link: "/category/grocery",
   banner2_alt: "Mega Sale",
   promo_text: "Buy 2 Get 1 Free (Add 3 item to cart)",
-  welcome_redirect_seconds: 1,
-  welcome_enabled: true,
 };
 
-export const getHomeContent = cache((): Promise<HomeContent> =>
-  cachedQuery(["home-content"], async () => {
-    try {
-      const { data } = await catalogClient
-        .from("settings")
-        .select(
-          "banner1_url, banner1_link, banner1_alt, banner2_url, banner2_link, banner2_alt, promo_text, welcome_redirect_seconds, welcome_enabled"
-        )
-        .eq("id", 1)
-        .maybeSingle();
-
-      if (!data) return DEFAULT_HOME_CONTENT;
-      return {
-        banner1_url: data.banner1_url || DEFAULT_HOME_CONTENT.banner1_url,
-        banner1_link: data.banner1_link || DEFAULT_HOME_CONTENT.banner1_link,
-        banner1_alt: data.banner1_alt || DEFAULT_HOME_CONTENT.banner1_alt,
-        banner2_url: data.banner2_url || DEFAULT_HOME_CONTENT.banner2_url,
-        banner2_link: data.banner2_link || DEFAULT_HOME_CONTENT.banner2_link,
-        banner2_alt: data.banner2_alt || DEFAULT_HOME_CONTENT.banner2_alt,
-        promo_text: data.promo_text || DEFAULT_HOME_CONTENT.promo_text,
-        // 0 is a valid value (timer off) — only fall back when the column is
-        // missing (migration 007 not yet applied). Decimal values (numeric in
-        // Postgres) come back as JS numbers, so the same check covers them.
-        welcome_redirect_seconds:
-          typeof data.welcome_redirect_seconds === "number"
-            ? data.welcome_redirect_seconds
-            : DEFAULT_HOME_CONTENT.welcome_redirect_seconds,
-        // Only fall back when the column is missing (migration 008 not yet
-        // applied) — false is a valid stored value.
-        welcome_enabled:
-          typeof data.welcome_enabled === "boolean"
-            ? data.welcome_enabled
-            : DEFAULT_HOME_CONTENT.welcome_enabled,
-      };
-    } catch {
-      return DEFAULT_HOME_CONTENT;
-    }
-  })
-);
+/** Home page content — banners + promo line. Hardcoded (the admin Home
+ *  Content screen was removed), so this never touches the database. */
+export const getHomeContent = (): HomeContent => DEFAULT_HOME_CONTENT;
 
 export const getProductPage = cache(
   (page: number): Promise<{ products: Product[]; page: number; total_page: number }> => {
@@ -140,37 +102,6 @@ export const getProductByHash = cache((hash: string): Promise<Product | null> =>
         .from("products")
         .select(PRODUCT_COLUMNS)
         .eq("hash", hash)
-        .maybeSingle();
-      return (data as Product) ?? null;
-    } catch {
-      return null;
-    }
-  })
-);
-
-/** First products in feed order — the welcome page only needs 1–2 cards. */
-export const getFeaturedProducts = cache((limit = 2): Promise<Product[]> =>
-  cachedQuery(["featured", String(limit)], async () => {
-    try {
-      const { data } = await catalogClient
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .order("order_number")
-        .limit(limit);
-      return (data as Product[]) ?? [];
-    } catch {
-      return [];
-    }
-  })
-);
-
-export const getFirstProduct = cache((): Promise<Product | null> =>
-  cachedQuery(["first-product"], async () => {
-    try {
-      const { data } = await catalogClient
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .eq("order_number", 1)
         .maybeSingle();
       return (data as Product) ?? null;
     } catch {

@@ -1,12 +1,14 @@
 -- =============================================================================
--- homeshopedeals — migration 005: admin-editable categories
+-- homeshopedeals — migration 004: admin-editable categories
 -- Paste this whole file into: Supabase Dashboard > SQL Editor > New query > Run
 -- Safe to re-run (idempotent).
 --
 -- What this adds:
 --   public.categories — the storefront category list (was static JSON)
 --   Seeded with the exact 11 categories from data/categories.json, so the
---   storefront looks identical the moment the table exists.
+--   storefront looks identical the moment the table exists. ON CONFLICT DO
+--   NOTHING: existing rows (or rows the admin already added) are never
+--   touched; this only fills the table when it is empty.
 --   Admin CRUD lives at /admin/categories (RLS: public read, admin write).
 -- =============================================================================
 
@@ -50,7 +52,7 @@ insert into public.categories (slug, orig_slug, name) values
 on conflict (slug) do nothing;
 
 -- ---------------------------------------------------------------------------
--- 3. ROW LEVEL SECURITY
+-- 3. ROW LEVEL SECURITY — re-assert every policy (idempotent).
 -- ---------------------------------------------------------------------------
 alter table public.categories enable row level security;
 
