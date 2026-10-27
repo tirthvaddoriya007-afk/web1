@@ -79,6 +79,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [items, ready]);
 
   const addItem = useCallback((p: Product, qty = 1, size?: string) => {
+    if (typeof window !== "undefined" && typeof (window as any).fbq === "function") {
+  (window as any).fbq("track", "AddToCart", {
+    content_ids: [p.hash],
+    content_name: p.name,
+    content_type: "product",
+    value: p.price * qty,
+    currency: "INR",
+    num_items: qty
+  });
+}
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.hash === p.hash && (i.size ?? "") === (size ?? ""));
       if (idx >= 0) {
