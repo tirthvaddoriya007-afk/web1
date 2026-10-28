@@ -298,7 +298,7 @@ const markCompleted = () => {
         open={popup !== null}
         state={popup ?? "opening"}
         onTryAgain={tryAgain}
-        onCompleted={markcompleted}
+        onCompleted={markCompleted}
         onCancel={cancel}
       />
     </div>
