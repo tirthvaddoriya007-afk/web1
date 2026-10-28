@@ -159,7 +159,15 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     // hand off to the same payment app again.
     handoff(method);
   };
-
+const markCompleted = () => {
+  const order = placeOrder(LABELS[method]);
+  if (order) {
+    setPopup(null);
+    setPlacing(false);
+    handedOff.current = false;
+    router.replace(/summary?order=${order.id});
+  }
+};
   const cancel = () => {
     // Stay on the payment page — selected method and amount are untouched.
     setPopup(null);
@@ -290,6 +298,7 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
         open={popup !== null}
         state={popup ?? "opening"}
         onTryAgain={tryAgain}
+        onCompleted={markcompleted}
         onCancel={cancel}
       />
     </div>
