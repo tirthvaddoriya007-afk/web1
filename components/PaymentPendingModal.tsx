@@ -19,10 +19,12 @@ export default function PaymentPendingModal({
   state,
   onTryAgain,
   onCancel,
+  onCompleted,
 }: {
   open: boolean;
   state: PaymentPopupState;
   onTryAgain: () => void;
+  onCompleted: () => void;
   onCancel: () => void;
 }) {
   if (!open) return null;
@@ -62,11 +64,20 @@ export default function PaymentPendingModal({
             <p className="mt-6 text-[17px] font-semibold text-[#1a2024]">
               Payment not completed?
             </p>
-            <p className="mt-2 text-[13px] leading-snug text-[#6b6b78]">
-              You can safely open the same payment app again and try once more.
-            </p>
-            <button
-              onClick={onTryAgain}
+           <p className="mt-2 text-[13px] leading-snug text-[#6b6b78]">
+  You can safely open the same payment app again and try once more.
+</p>
+
+<button
+  onClick={onCompleted}
+  className="mt-6 w-full py-3 rounded-lg text-white text-[15px] font-semibold"
+  style={{ background: "var(--brand)" }}
+>
+  Payment Completed
+</button>
+
+<button
+  onClick={onTryAgain}
               className="mt-6 w-full py-3 rounded-lg text-white text-[15px] font-semibold"
               style={{ background: "var(--brand)" }}
             >
