@@ -165,7 +165,7 @@ const markCompleted = () => {
     setPopup(null);
     setPlacing(false);
     handedOff.current = false;
-    router.replace(/summary?order=${order.id});
+    router.replace(`/summary?order=${order.id}`);
   }
 };
   const cancel = () => {
