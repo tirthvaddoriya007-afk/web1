@@ -16,7 +16,27 @@ function SummaryInner() {
   useEffect(() => {
     if (ready && !order) router.replace("/home");
   }, [ready, order, router]);
+useEffect(() => {
+  if (!order) return;
 
+  const purchaseKey = `meta_purchase_${order.id}` ;
+
+  if (
+    typeof window !== "undefined" &&
+    typeof (window as any).fbq === "function" &&
+    !window.sessionStorage.getItem(purchaseKey)
+  ) {
+    (window as any).fbq("track", "Purchase", {
+      value: order.total,
+      currency: "INR",
+      content_type: "product",
+      content_ids: order.items.map((item) => item.hash),
+      num_items: order.items.reduce((sum, item) => sum + item.qty, 0),
+    });
+
+    window.sessionStorage.setItem(purchaseKey, "1");
+  }
+}, [order]);
   if (!order) return null;
 
   return (
