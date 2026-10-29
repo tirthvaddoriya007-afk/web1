@@ -1,0 +1,24 @@
+/node_modules
+/.next
+/out
+/build
+*.log
+.DS_Store
+.env*.local
+next-env.d.ts
+.commandcode/
+
+.vercel
+.env*
+
+# PHP storefront: cache files are generated at runtime, never committed.
+/homeshop-php/cache/
+
+# PHP storefront has its own repo (phpdeals); the admin repo doesn't need it.
+/homeshop-php/
+
+# Loose working folders (product screenshots / image swap sources).
+/new product 2/
+/new product 3/
+/new product number 4/
+/image changes/

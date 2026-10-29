@@ -1,0 +1,513 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-app: var(--font-app-face); /* set in app/layout.tsx */
+  --brand: #9f2089;
+  --brand-dark: #570b47;
+  --brand-bar: #970e71;
+  --app-width: 400px;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #e9e9ee; /* desktop backdrop behind the phone-width app */
+  color: #333;
+  font-family: var(--font-app), system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+/* -------- App shell: phone-width, centered on desktop, same on mobile ------- */
+.app-shell {
+  width: 100%;
+  max-width: var(--app-width);
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #fff;
+  position: relative;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.08);
+  overflow-x: hidden;
+}
+
+.app-main {
+  padding-bottom: 76px; /* room for bottom nav */
+}
+
+/* ------------------------------ Header ------------------------------------ */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* --------------------------- Bottom nav ----------------------------------- */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--app-width);
+  background: #fff;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 6px 0 8px;
+  z-index: 45;
+}
+.bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #616173;
+  text-decoration: none;
+}
+.bottom-nav a.active {
+  color: var(--brand);
+  font-weight: 600;
+}
+.bottom-nav .nav-ic {
+  display: block;
+  line-height: 0;
+}
+.bottom-nav .nav-ic svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* --------------------------- Marquee -------------------------------------- */
+.marquee {
+  background: var(--brand-bar);
+  overflow: hidden;
+  padding: 10px 0;
+  white-space: nowrap;
+}
+.marquee__inner {
+  display: inline-block;
+  animation: marquee 12s linear infinite;
+}
+.marquee span {
+  color: #fff;
+  font-weight: 900;
+  font-size: 16px;
+  padding: 0 24px;
+}
+@keyframes marquee {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+/* --------------------------- Daily Deals bar ------------------------------ */
+/* Eye-catching header: big, extra-bold Meesho-purple gradient title next to
+   the countdown pill. Written as plain CSS so the exact declarations apply. */
+.deals-title {
+  display: flex;
+  align-items: center;
+  margin: 0 6px 0 0;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: normal;
+  color: #616173;
+  white-space: nowrap;
+}
+.deals-title-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+  background: linear-gradient(90deg, #570b47 0%, #9f2089 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #570d48;
+}
+/* div.eVLdcs — #FFE8CD, 0 8px padding, 20px tall, 4px radius */
+.deals-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  padding: 2px 8px;
+  border: 1px solid #f6d3ac;
+  border-radius: 4px;
+  background: #ffe8cd;
+  white-space: nowrap;
+}
+/* span.jFYRpH — 13px "Mier demi" (600), #9F2089 */
+.deals-timer span {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: #9f2089;
+}
+
+/* --------------------------- Product grid --------------------------------- */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  padding: 1px;
+  background: #fff;
+}
+
+/* ---------------------- Catalog card (reference match) -------------------- */
+.pc {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  padding-bottom: 10px;
+  /* Offscreen cards skip layout/paint until scrolled near — first paint stays fast. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}
+.pc-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.pc-img {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #f7f7f9;
+}
+.pc-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Single muted line, truncated with an ellipsis (reference tile style). */
+.pc-name {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #8b8ba3;
+  /* 21px above = .product-details margin-top 16px + its 5px padding-top */
+  margin: 21px 5px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pc-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 4px;
+  margin: 0 5px 4px;
+}
+.pc-sell {
+  font-size: 15px;
+  font-weight: 800;
+  color: #570b47;
+}
+.pc-mrp {
+  font-size: 11px;
+  color: #9b9b9b;
+  text-decoration: line-through;
+}
+.pc-off {
+  font-size: 11px;
+  color: #8b8ba3;
+  font-weight: 600;
+}
+/* Timer + Buy Now keep a small side gutter, matching the reference tiles. */
+.pc-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 5px 10px;
+  height: 27px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: #ffe8cd;
+  border: 1px solid #f6d3ac;
+  color: #333333;
+  font-size: 12px;
+  font-weight: 600;
+}
+/* countdown text inside the pill — 16px "Mier demi", #9F2089, 16px line-box */
+.pc-timer span {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 16px;
+  color: #9f2089;
+}
+.pc-timer-ico {
+  font-size: 14px;
+}
+.pc-buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 5px 15px;
+  height: 40px;
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  background: #9f2089;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.pc-offer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  margin: 0 5px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #038d63;
+  white-space: nowrap;
+}
+.pc-offer-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #038d63;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+.pc-free {
+  margin: 0 5px 4px;
+  font-size: 11px;
+  color: #7e808c;
+  font-weight: 600;
+}
+.pc-rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 5px 0;
+}
+.pc-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #038d63;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.pc-count {
+  font-size: 11px;
+  color: #9b9b9b;
+}
+.pc-trusted {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.product-card {
+  display: block;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+.product-card .img-wrap {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #f7f7f9;
+}
+.product-card .img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.hot-badge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--brand-dark);
+  color: #fff;
+  padding: 3px 7px;
+  font-size: 10px;
+  border-radius: 3px;
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+/* Payment-pending ring: spins forever, independent of the countdown text. */
+.pay-spin {
+  animation: pay-spin 1.1s linear infinite;
+}
+@keyframes pay-spin {
+  to { transform: rotate(360deg); }
+}
+.product-name {
+  font-size: 12px;
+  line-height: 1.3;
+  margin: 6px 8px 2px;
+  height: 31px;
+  overflow: hidden;
+  color: #333;
+}
+.price-row {
+  margin: 2px 8px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sell-price {
+  font-weight: 700;
+  color: var(--brand-dark);
+  font-size: 14px;
+}
+.mrp-price {
+  color: #9b9b9b;
+  text-decoration: line-through;
+  font-size: 12px;
+}
+.off-pct {
+  color: #03a685;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ------------------- Product page (reference metrics) --------------------- */
+/* div.product-title — 15px "Mier demi" / #8B8BA3, 2 lines ≈ 42px tall */
+.product-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 21px;
+  color: #8b8ba3;
+  margin: 0;
+}
+
+/* --------------------------- Buttons -------------------------------------- */
+.btn-brand {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+}
+.btn-outline {
+  background: #fff;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  padding: 12px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Bottom action bar CTAs — one spec shared by cart, product, address, payment
+   and summary (measured on the cart's Continue button: 44px tall, 15px
+   "Mier demi", #FFFFFF on #9F2089, 12px padding, 4px radius, equal widths). */
+.action-bar .btn-brand,
+.action-bar .btn-outline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  flex: 1;
+  width: auto;
+}
+.action-bar .btn-brand {
+  background: #9f2089;
+  color: #ffffff;
+}
+.action-bar .btn-outline {
+  background: #ffffff;
+  color: #9f2089;
+  border: 1px solid #9f2089;
+}
+
+/* Bottom action bar (product page) */
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--app-width);
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: #fff;
+  border-top: 1px solid #eee;
+  z-index: 45;
+}
+
+.rating-meter {
+  height: 6px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  flex: 1;
+}
+.rating-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+}
+
+.card {
+  background: #fff;
+  border-bottom: 5px solid #eaeaf2;
+}
+
+/* Cart drawer */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 60;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 50%;
+  transform: translateX(50%);
+  width: 100%;
+  max-width: var(--app-width);
+  background: #fff;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+}
