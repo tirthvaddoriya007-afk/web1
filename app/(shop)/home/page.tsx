@@ -41,7 +41,7 @@ export default async function HomePage() {
       <Marquee text={content.promo_text} />
 
       {/* 4. Below-marquee banner (trust badges strip) */}
-      <Banner src="/banners/below-marquee.webp" alt="Easy returns, Cash on delivery, Lowest price" width={720} height={112} />
+      <Banner src="/banners/below-marquee.png" alt="Easy returns, Cash on delivery, Lowest price" width={720} height={112} />
 
       {/* 5. Daily Deals header + countdown */}
       <DealsBar />

@@ -7,13 +7,13 @@
 
 export const brand = {
   // Shown in the header, titles, footer, everywhere.
-  name: "Meesho",
+  name: "Mega sale",
   tagline: "Sale Sale Sale",
 
   // Logo: the Meesho wordmark extracted from
   // lavender-chimpanzee-574483.hostingersite.com/index.html. The header
   // renders this image whenever logoSrc is set.
-  logoSrc: "/meesho-logo.svg" as string,
+  logoSrc: "/meesho-logo.png" as string,
 
   // Theme colors (kept in sync with tailwind.config.ts `brand` palette).
   colors: {
