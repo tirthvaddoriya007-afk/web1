@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 import { useStore } from "@/lib/store";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export default function AddToCartBar({ product, size }: { product: Product; size: string }) {
   const { addItem, openCart } = useStore();
@@ -10,11 +11,25 @@ export default function AddToCartBar({ product, size }: { product: Product; size
 
   const add = () => {
     addItem(product, 1, size);
+    trackMetaEvent("AddToCart", {
+      content_ids: [product.hash],
+      content_type: "product",
+      contents: [{ id: product.hash, quantity: 1, item_price: product.price }],
+      value: product.price,
+      currency: "INR",
+    });
     openCart();
   };
 
   const buyNow = () => {
     addItem(product, 1, size);
+    trackMetaEvent("AddToCart", {
+      content_ids: [product.hash],
+      content_type: "product",
+      contents: [{ id: product.hash, quantity: 1, item_price: product.price }],
+      value: product.price,
+      currency: "INR",
+    });
     router.push("/cart");
   };
 

@@ -21,7 +21,8 @@ interface StoreCtx {
   address: Address | null;
   saveAddress: (a: Address) => void;
   orders: Order[];
-  placeOrder: (paymentMode: string) => Order | null;
+  currentOrder: Order | null;
+  saveOrder: (order: Order) => void;
   ready: boolean;
   cartOpen: boolean;
   openCart: () => void;
@@ -64,6 +65,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [address, setAddress] = useState<Address | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [ready, setReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
 
@@ -120,26 +122,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Whole-cart combo: one flat % off the cart total based on total units.
   const comboDiscount = round2((total * tierPct(count)) / 100);
 
-  const placeOrder = useCallback(
-    (paymentMode: string): Order | null => {
-      if (items.length === 0 || !address) return null;
-      const orderTotal = round2(total - comboDiscount);
-      const order: Order = {
-        id: "OD" + Date.now().toString().slice(-10),
-        items: [...items],
-        total: orderTotal,
-        address,
-        paymentMode,
-        status: "Confirmed",
-        placedAt: new Date().toISOString(),
-      };
-      const next = [order, ...orders];
-      setOrders(next);
-      write(ORDERS_KEY, next);
+  const saveOrder = useCallback(
+    (order: Order) => {
+      setCurrentOrder(order);
+      setOrders((existing) => [order, ...existing.filter((item) => item.id !== order.id)]);
       setItems([]);
-      return order;
+      write(CART_KEY, []);
     },
-    [items, total, comboDiscount, address, orders]
+    []
   );
 
   const payable = round2(total - comboDiscount);
@@ -149,7 +139,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       value={{
         items, count, total, mrpTotal, comboDiscount, payable,
         addItem, removeItem, setQty, clear,
-        address, saveAddress, orders, placeOrder, ready,
+        address, saveAddress, orders, currentOrder, saveOrder, ready,
         cartOpen,
         openCart: () => setCartOpen(true),
         closeCart: () => setCartOpen(false),

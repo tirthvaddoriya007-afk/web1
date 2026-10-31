@@ -6,6 +6,7 @@ import { PRODUCT_COLUMNS } from "@/lib/productColumns";
 import type { Product } from "@/lib/types";
 import ProductCardOffer from "@/components/ProductCardOffer";
 import { ProductGridSkeleton } from "@/components/StoreSkeleton";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 const LIMIT = 80;
 
@@ -44,6 +45,7 @@ export default function SearchClient() {
           if (reqId.current === id) {
             setResults((data as Product[]) ?? []);
             setLoading(false);
+            trackMetaEvent("Search", { search_string: s });
           }
         },
         () => {

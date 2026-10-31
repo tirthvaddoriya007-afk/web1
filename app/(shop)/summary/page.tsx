@@ -6,16 +6,37 @@ import { Suspense, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
+import { trackMetaEventOnce } from "@/lib/meta-pixel";
 
 function SummaryInner() {
-  const { orders, ready } = useStore();
+  const { orders, currentOrder, ready } = useStore();
   const router = useRouter();
   const orderId = useSearchParams().get("order");
-  const order = orders.find((o) => o.id === orderId) || orders[0];
+  const order = currentOrder?.id === orderId
+    ? currentOrder
+    : orderId
+      ? orders.find((o) => o.id === orderId)
+      : orders[0];
 
   useEffect(() => {
     if (ready && !order) router.replace("/home");
   }, [ready, order, router]);
+
+  useEffect(() => {
+    if (!ready || !order || order.status !== "Confirmed") return;
+    trackMetaEventOnce(`meta-purchase-${order.id}`, "Purchase", {
+      content_ids: order.items.map((item) => item.hash),
+      content_type: "product",
+      contents: order.items.map((item) => ({
+        id: item.hash,
+        quantity: item.qty,
+        item_price: item.price,
+      })),
+      value: order.total,
+      currency: "INR",
+      num_items: order.items.reduce((count, item) => count + item.qty, 0),
+    });
+  }, [ready, order]);
 
   if (!order) return null;
 

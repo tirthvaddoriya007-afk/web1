@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Product } from "@/lib/types";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 import AddToCartBar from "./AddToCartBar";
 import OfferBanner from "./OfferBanner";
 import { formatPrice, seededRandom } from "@/lib/data";
@@ -32,13 +33,23 @@ export default function ProductPurchase({ product }: { product: Product }) {
   const Ratingcount = Math.floor(rnd() * 300) + 100;
   const productCount = Math.floor(rnd() * 40) + 10;
   const [storeName, setStoreName] = useState("");
+  const viewedProduct = useRef<string | null>(null);
   useEffect(() => {
+    if (viewedProduct.current !== product.hash) {
+      viewedProduct.current = product.hash;
+      trackMetaEvent("ViewContent", {
+        content_ids: [product.hash],
+        content_type: "product",
+        value: product.price,
+        currency: "INR",
+      });
+    }
     const randomIndex = Math.floor(
       Math.random() * storeNames.length
     );
 
     setStoreName(storeNames[randomIndex]);
-  }, []);
+  }, [product.hash, product.price]);
   return (
     <>
       {/* Select Size — S is selected initially, only one at a time */}

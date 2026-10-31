@@ -10,6 +10,7 @@ next-env.d.ts
 
 .vercel
 .env*
+!.env.local.example
 
 # PHP storefront: cache files are generated at runtime, never committed.
 /homeshop-php/cache/

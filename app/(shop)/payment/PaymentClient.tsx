@@ -7,6 +7,8 @@ import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
 import PaymentPendingModal, { type PaymentPopupState } from "@/components/PaymentPendingModal";
 import { buildUpiLink, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
+import { trackMetaEvent } from "@/lib/meta-pixel";
+import type { Order } from "@/lib/types";
 
 type Method = "gpay" | "phonepe" | "paytm" | "cod";
 
@@ -18,18 +20,37 @@ const LABELS: Record<Method, string> = {
 };
 
 export default function PaymentClient({ upi }: { upi: UpiConfig }) {
-  const { items, total, comboDiscount, payable, address, placeOrder, ready } = useStore();
+  const { items, total, comboDiscount, payable, address, saveOrder, ready } = useStore();
   const router = useRouter();
 
   // No UPI ID saved in the admin panel yet — COD is the only workable option.
   const upiReady = upiConfigured(upi);
   const [method, setMethod] = useState<Method>(upiReady ? "phonepe" : "cod");
   const [placing, setPlacing] = useState(false);
+  const [orderError, setOrderError] = useState("");
   // "opening" = spinner popup during hand-off; "incomplete" = the "Payment
   // not completed?" popup shown when the user comes back from the UPI app.
   const [popup, setPopup] = useState<PaymentPopupState | null>(null);
   // True once the UPI deep link has been fired; guards the return listeners.
   const handedOff = useRef(false);
+  const paymentInfoTracked = useRef(false);
+
+  const trackPaymentInfo = (selectedMethod: Method) => {
+    if (paymentInfoTracked.current) return;
+    paymentInfoTracked.current = true;
+    trackMetaEvent("AddPaymentInfo", {
+      content_ids: items.map((item) => item.hash),
+      content_type: "product",
+      contents: items.map((item) => ({
+        id: item.hash,
+        quantity: item.qty,
+        item_price: item.price,
+      })),
+      value: payable,
+      currency: "INR",
+      payment_method: selectedMethod,
+    });
+  };
 
   useEffect(() => {
     if (ready && !popup && (items.length === 0 || !address)) router.replace("/cart");
@@ -116,17 +137,17 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
   const selectMethod = (k: Method) => {
     setMethod(k);
     if (k === "cod" || !upiReady || k === method) return;
+    trackPaymentInfo(k);
     snapshotFirstOrder();
     handoff(k);
   };
 
   const pay = () => {
+    trackPaymentInfo(method);
     if (method === "cod") {
       setPlacing(true);
-      setTimeout(() => {
-        const order = placeOrder(LABELS.cod);
-        router.replace(order ? `/summary?order=${order.id}` : "/cart");
-      }, 700);
+      setOrderError("");
+      setTimeout(() => { void submitOrder(LABELS.cod); }, 700);
       return;
     }
 
@@ -134,6 +155,33 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
     // reference store's Ordered* keys), then hand off to the chosen app.
     snapshotFirstOrder();
     handoff(method);
+  };
+
+  const submitOrder = async (paymentMode: string) => {
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map(({ hash, qty, size }) => ({ hash, qty, size })),
+          address,
+          paymentMode,
+        }),
+      });
+      const result = await response.json().catch(() => null) as
+        | { order?: Order; error?: string }
+        | null;
+      if (!response.ok || !result?.order) {
+        throw new Error(result?.error || "Order could not be saved.");
+      }
+
+      saveOrder(result.order);
+      router.replace(`/summary?order=${encodeURIComponent(result.order.id)}`);
+    } catch (error) {
+      console.error("Could not place order:", error);
+      setOrderError(error instanceof Error ? error.message : "Order could not be saved. Please try again.");
+      setPlacing(false);
+    }
   };
 
   // Mirrors the reference store: the first order ever placed is snapshotted
@@ -285,6 +333,11 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
           {placing ? "Processing..." : method === "cod" ? "Place Order" : "PayNow"}
         </button>
       </div>
+      {orderError && (
+        <p role="alert" className="px-4 pb-4 text-[13px] text-red-600">
+          {orderError}
+        </p>
+      )}
 
       <PaymentPendingModal
         open={popup !== null}

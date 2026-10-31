@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useStore, tierPct } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export default function CartPage() {
   const { items, count, total, comboDiscount, payable, setQty, removeItem, ready } = useStore();
@@ -124,7 +125,22 @@ export default function CartPage() {
         </div>
         {/* Continue — 179.2 × 44, 15px "Mier demi", #FFFFFF on #9F2089, padding
             12px. Metrics come from the shared .action-bar CTA rule. */}
-        <Link href="/address" className="btn-brand no-underline">
+        <Link
+          href="/address"
+          className="btn-brand no-underline"
+          onClick={() => trackMetaEvent("InitiateCheckout", {
+            content_ids: items.map((item) => item.hash),
+            content_type: "product",
+            contents: items.map((item) => ({
+              id: item.hash,
+              quantity: item.qty,
+              item_price: item.price,
+            })),
+            value: payable,
+            currency: "INR",
+            num_items: count,
+          })}
+        >
           Continue
         </Link>
       </div>
