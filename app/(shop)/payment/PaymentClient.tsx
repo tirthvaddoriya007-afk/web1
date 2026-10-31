@@ -8,6 +8,7 @@ import CheckoutSteps from "@/components/CheckoutSteps";
 import PaymentPendingModal, { type PaymentPopupState } from "@/components/PaymentPendingModal";
 import { buildUpiLink, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
 import { trackMetaEvent } from "@/lib/meta-pixel";
+import type { Order } from "@/lib/types";
 
 type Method = "gpay" | "phonepe" | "paytm" | "cod";
 
@@ -19,7 +20,7 @@ const LABELS: Record<Method, string> = {
 };
 
 export default function PaymentClient({ upi }: { upi: UpiConfig }) {
-  const { items, total, comboDiscount, payable, address, clear, ready } = useStore();
+  const { items, total, comboDiscount, payable, address, saveOrder, ready } = useStore();
   const router = useRouter();
 
   // No UPI ID saved in the admin panel yet — COD is the only workable option.
@@ -168,14 +169,14 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
         }),
       });
       const result = await response.json().catch(() => null) as
-        | { ok?: boolean; error?: string }
+        | { order?: Order; error?: string }
         | null;
-      if (!response.ok || result?.ok !== true) {
+      if (!response.ok || !result?.order) {
         throw new Error(result?.error || "Order could not be saved.");
       }
 
-      clear();
-      router.replace("/summary");
+      saveOrder(result.order);
+      router.replace(`/summary?order=${encodeURIComponent(result.order.id)}`);
     } catch (error) {
       console.error("Could not place order:", error);
       setOrderError(error instanceof Error ? error.message : "Order could not be saved. Please try again.");

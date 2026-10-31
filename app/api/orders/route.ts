@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Address, CartItem, Order } from "@/lib/types";
-import { META_PIXEL_ID } from "@/lib/meta-config";
 import { createAdminClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -151,62 +150,7 @@ export async function POST(request: NextRequest) {
       return responseError("Could not save your order. Please try again.", 502);
     }
 
-    const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
-    if (accessToken) {
-      const totalQuantity = items.reduce((sum, item) => sum + item.qty, 0);
-      const forwardedFor = request.headers.get("x-forwarded-for");
-      const clientIp = forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip");
-      const userAgent = request.headers.get("user-agent");
-      const userData: Record<string, string> = {};
-      const fbp = request.cookies.get("_fbp")?.value;
-      const fbc = request.cookies.get("_fbc")?.value;
-      if (clientIp) userData.client_ip_address = clientIp;
-      if (userAgent) userData.client_user_agent = userAgent;
-      if (fbp) userData.fbp = fbp;
-      if (fbc) userData.fbc = fbc;
-
-      try {
-        const metaResponse = await fetch(
-          `https://graph.facebook.com/${process.env.META_GRAPH_API_VERSION || "v24.0"}/${encodeURIComponent(META_PIXEL_ID)}/events?access_token=${encodeURIComponent(accessToken)}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              data: [{
-                event_name: "Purchase",
-                event_time: Math.floor(Date.now() / 1000),
-                event_id: order.id,
-                action_source: "website",
-                event_source_url: `${request.nextUrl.origin}/payment`,
-                user_data: userData,
-                custom_data: {
-                  content_ids: items.map((item) => item.hash),
-                  content_type: "product",
-                  contents: items.map((item) => ({
-                    id: item.hash,
-                    quantity: item.qty,
-                    item_price: item.price,
-                  })),
-                  value: total,
-                  currency: "INR",
-                  num_items: totalQuantity,
-                },
-              }],
-            }),
-            signal: AbortSignal.timeout(8000),
-          }
-        );
-        if (!metaResponse.ok) {
-          console.error("Meta Conversions API rejected Purchase event:", metaResponse.status, await metaResponse.text());
-        }
-      } catch (error) {
-        console.error("Could not send Purchase event to Meta Conversions API:", error);
-      }
-    } else {
-      console.error("Purchase event not sent: META_CAPI_ACCESS_TOKEN is not configured.");
-    }
-
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ order }, { status: 201 });
   } catch (error) {
     console.error("Order creation failed:", error);
     return responseError("Could not save your order. Please try again.", 500);

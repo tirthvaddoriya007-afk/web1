@@ -5,6 +5,7 @@ import type { CartItem, Product, Address, Order } from "./types";
 
 const CART_KEY = "products"; // same key name the reference app used
 const ADDR_KEY = "address";
+const ORDERS_KEY = "orders";
 
 interface StoreCtx {
   items: CartItem[];
@@ -19,6 +20,9 @@ interface StoreCtx {
   clear: () => void;
   address: Address | null;
   saveAddress: (a: Address) => void;
+  orders: Order[];
+  currentOrder: Order | null;
+  saveOrder: (order: Order) => void;
   ready: boolean;
   cartOpen: boolean;
   openCart: () => void;
@@ -60,17 +64,15 @@ export function tierPct(count: number): number {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [address, setAddress] = useState<Address | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [ready, setReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     setItems(read<CartItem[]>(CART_KEY, []));
     setAddress(read<Address | null>(ADDR_KEY, null));
-    try {
-      window.localStorage.removeItem("orders");
-    } catch (error) {
-      console.error("Could not remove legacy local order data:", error);
-    }
+    setOrders(read<Order[]>(ORDERS_KEY, []));
     setReady(true);
   }, []);
 
@@ -120,6 +122,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Whole-cart combo: one flat % off the cart total based on total units.
   const comboDiscount = round2((total * tierPct(count)) / 100);
 
+  const saveOrder = useCallback(
+    (order: Order) => {
+      setCurrentOrder(order);
+      setOrders((existing) => [order, ...existing.filter((item) => item.id !== order.id)]);
+      setItems([]);
+      write(CART_KEY, []);
+    },
+    []
+  );
+
   const payable = round2(total - comboDiscount);
 
   return (
@@ -127,7 +139,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       value={{
         items, count, total, mrpTotal, comboDiscount, payable,
         addItem, removeItem, setQty, clear,
-        address, saveAddress, ready,
+        address, saveAddress, orders, currentOrder, saveOrder, ready,
         cartOpen,
         openCart: () => setCartOpen(true),
         closeCart: () => setCartOpen(false),
