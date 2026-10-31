@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
+// Next.js processes this global stylesheet; TypeScript may not resolve CSS side-effect imports.
+// @ts-ignore
 import "./globals.css";
 
 // Manrope — closest free match to the reference's licensed "Mier" typeface.
@@ -16,7 +18,7 @@ import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: `${brand.tagline} - ${brand.name}`,
-  description: `${brand.name} — mega sale on groceries, fashion, electronics and more.`,
+  description: `${brand.name} — on groceries, fashion, electronics and more.`,
 };
 
 export const viewport: Viewport = {
