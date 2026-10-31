@@ -5,10 +5,10 @@ import { useState } from "react";
 import { brand } from "@/lib/brand";
 
 const TILES = [
-  { title: "Orders", sub: "Track, modify,…", icon: "📦" },
-  { title: "Returns", sub: "Policy & pickup", icon: "↩️" },
-  { title: "Payments", sub: "Refunds & C…", icon: "💳" },
-  { title: "Contact", sub: "Chat, email &…", icon: "🎧" },
+  { title: "Orders", sub: "Track, modify,…", icon: "📦", href: "/order" },
+  { title: "Returns", sub: "Policy & pickup", icon: "↩️", href: "/policy/return-refund" },
+  { title: "Payments", sub: "Refunds & C…", icon: "💳", href: "/policy/return-refund" },
+  { title: "Contact", sub: "Chat, email &…", icon: "🎧", href: "#need-more-help" },
 ];
 
 const CATEGORIES = [
@@ -50,13 +50,18 @@ export default function HelpPage() {
           {/* Quick tiles */}
           <div className="grid grid-cols-2 gap-2.5 mt-4">
             {TILES.map((t) => (
-              <div key={t.title} className="flex items-center gap-2.5 border border-[#f0e6f0] rounded-xl p-3">
+              <Link
+                key={t.title}
+                href={t.href}
+                className="flex items-center gap-2.5 border border-[#f0e6f0] rounded-xl p-3 no-underline transition-colors hover:bg-[#fdf8fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                style={{ outlineColor: "var(--brand)" }}
+              >
                 <span className="w-9 h-9 rounded-lg bg-[#f7ecf5] grid place-items-center text-[16px]">{t.icon}</span>
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-[#1a2024]">{t.title}</p>
                   <p className="text-[11px] text-[#9b9b9b] truncate">{t.sub}</p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -87,7 +92,7 @@ export default function HelpPage() {
       </Section>
 
       {/* Need more help */}
-      <Section title="Need more help?" icon={<HeadsetIcon />}>
+      <Section id="need-more-help" title="Need more help?" icon={<HeadsetIcon />}>
         <div className="space-y-2.5">
           <ContactCard icon={<ChatIcon />} title="Chat with us" sub="Get instant answers from our virtual assistant." />
           <ContactCard icon={<MailIcon />} title="Email Support" sub="We usually respond within 24 hours." />
@@ -104,15 +109,20 @@ export default function HelpPage() {
       </Section>
 
       <p className="text-center text-[12px] text-[#9b9b9b] py-6">
-        © {new Date().getFullYear()} <span style={{ color: "var(--brand)" }}>{brand.name} Help Centre</span> · Policies · Terms · Privacy
+        © {new Date().getFullYear()} <span style={{ color: "var(--brand)" }}>{brand.name} Help Centre</span>
+        <span className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
+          <Link href="/policy/return-refund" className="no-underline">Returns & refunds</Link>
+          <Link href="/policy/privacy" className="no-underline">Privacy</Link>
+          <Link href="/policy/storepolicy" className="no-underline">Store Policy</Link>
+        </span>
       </p>
     </div>
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Section({ id, title, icon, children }: { id?: string; title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="px-4 mt-4">
+    <div id={id} className="px-4 mt-4 scroll-mt-4">
       <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] p-4">
         <h2 className="flex items-center gap-2 font-bold text-[15px] mb-3">{icon}{title}</h2>
         {children}

@@ -29,8 +29,8 @@ export const brand = {
 
   // Support contact shown on the Help page.
   support: {
-    email: "support@meesho.example",
-    whatsapp: "+91 00000 00000",
+    email: "tirthvaddoriya007@gmail.com",
+    whatsapp: "+91 81605 64944",
     hours: "Mon–Sat, 10am – 7pm",
   },
 };
