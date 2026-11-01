@@ -6,7 +6,6 @@ import { Suspense, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
-import { trackMetaEventOnce } from "@/lib/meta-pixel";
 
 function SummaryInner() {
   const { orders, currentOrder, ready } = useStore();
@@ -22,23 +21,9 @@ function SummaryInner() {
     if (ready && !order) router.replace("/home");
   }, [ready, order, router]);
 
-  useEffect(() => {
-    if (!ready || !order || order.status !== "Confirmed") return;
-    trackMetaEventOnce(`meta-purchase-${order.id}`, "Purchase", {
-      content_ids: order.items.map((item) => item.hash),
-      content_type: "product",
-      contents: order.items.map((item) => ({
-        id: item.hash,
-        quantity: item.qty,
-        item_price: item.price,
-      })),
-      value: order.total,
-      currency: "INR",
-      num_items: order.items.reduce((count, item) => count + item.qty, 0),
-    });
-  }, [ready, order]);
-
   if (!order) return null;
+  const isPending = order.status === "Awaiting advance" || order.status === "Awaiting payment";
+  const isCod = order.paymentMode === "Cash on Delivery";
 
   return (
     <div className="pb-24 bg-[#f4f4f6] min-h-screen">
@@ -46,17 +31,33 @@ function SummaryInner() {
         <CheckoutSteps active={4} />
       </div>
 
-      {/* Success banner */}
+      {/* Order status */}
       <div className="bg-white mt-2 px-4 py-8 text-center">
-        <div className="mx-auto w-16 h-16 rounded-full grid place-items-center" style={{ background: "#e7f7ef" }}>
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1ba672" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" opacity=".25" />
-            <path d="M7 12.5l3.5 3.5L17 9" />
-          </svg>
+        <div
+          className="mx-auto w-16 h-16 rounded-full grid place-items-center"
+          style={{ background: isPending ? "#fff5e6" : "#e7f7ef" }}
+        >
+          {isPending ? (
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#c27a12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+          ) : (
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1ba672" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" opacity=".25" />
+              <path d="M7 12.5l3.5 3.5L17 9" />
+            </svg>
+          )}
         </div>
-        <h1 className="text-[20px] font-extrabold mt-3 text-[#1a2024]">Order Confirmed!</h1>
+        <h1 className="text-[20px] font-extrabold mt-3 text-[#1a2024]">
+          {isPending ? "Payment verification pending" : "Order Confirmed"}
+        </h1>
         <p className="text-[13px] text-[#7e808c] mt-1">
-          Thank you for your purchase. Your order is being processed.
+          {isPending
+            ? isCod
+              ? "We will confirm your COD order after manually verifying the UPI advance."
+              : "We will confirm your order after manually verifying the full UPI payment."
+            : "Your order is being processed."}
         </p>
         <div className="inline-flex items-center gap-2 mt-4 bg-[#faf5f9] border border-[#ecd9e7] rounded-lg px-3 py-2">
           <span className="text-[12px] text-[#7e808c]">Order No.</span>
@@ -87,6 +88,16 @@ function SummaryInner() {
           <span>Order Total</span>
           <span>{formatPrice(order.total)}</span>
         </div>
+        <div className="mt-2 border-t pt-2 text-[13px]">
+          <div className="flex justify-between py-1">
+            <span>{isCod ? "UPI advance" : "UPI payment"}</span><span>{formatPrice(order.advanceAmount ?? 0)}</span>
+          </div>
+          {isCod && (
+            <div className="flex justify-between py-1">
+              <span>Balance due on delivery</span><span>{formatPrice(order.balanceDue ?? order.total)}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Delivery + payment */}
@@ -106,7 +117,7 @@ function SummaryInner() {
       {/* Actions */}
       <div className="action-bar">
         <Link href="/order" className="btn-outline no-underline text-center">
-          Track Order
+          Check Order Status
         </Link>
         <Link href="/home" className="btn-brand no-underline text-center">
           Continue Shopping

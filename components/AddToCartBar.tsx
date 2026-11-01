@@ -5,7 +5,7 @@ import type { Product } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { trackMetaEvent } from "@/lib/meta-pixel";
 
-export default function AddToCartBar({ product, size }: { product: Product; size: string }) {
+export default function AddToCartBar({ product, size }: { product: Product; size?: string }) {
   const { addItem, openCart } = useStore();
   const router = useRouter();
 

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { brand } from "@/lib/brand";
 
 // Keep well-behaved crawlers efficient: everything is indexable, the sitemap
 // lists every route, and the /mobile-only loader page is excluded.
@@ -11,6 +12,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/mobile-only", "/admin"],
       },
     ],
-    sitemap: "https://big-deal.online/sitemap.xml",
+    sitemap: `${brand.siteUrl}/sitemap.xml`,
   };
 }

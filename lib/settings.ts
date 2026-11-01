@@ -36,7 +36,7 @@ export const getUpiConfig = cache((): Promise<UpiConfig> =>
 
       return {
         vpa: data.upi_vpa,
-        payeeName: data.upi_payee_name || brand.name,
+        payeeName: data.upi_payee_name || brand.seller.legalName,
         merchantCode: data.upi_merchant_code || "",
       };
     } catch {

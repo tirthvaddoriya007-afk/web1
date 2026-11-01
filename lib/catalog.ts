@@ -64,7 +64,7 @@ export const DEFAULT_HOME_CONTENT: HomeContent = {
   banner2_url: "/banners/hero.webp",
   banner2_link: "/category/grocery",
   banner2_alt: "Mega Sale",
-  promo_text: "Get Upto 80% off on all products! Limited time offer.",
+  promo_text: "Browse products across our store.",
 };
 
 /** Home page content — banners + promo line. Hardcoded (the admin Home

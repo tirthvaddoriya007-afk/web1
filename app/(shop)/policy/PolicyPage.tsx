@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { brand } from "@/lib/brand";
 
 const links = [
   { href: "/policy/return-refund", label: "Return & refund" },
@@ -25,7 +26,7 @@ export default function PolicyPage({
 
         <header className="mt-4 rounded-2xl bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.05)]">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--brand)" }}>
-            Mega sale · Policies
+            {brand.name} · Policies
           </p>
           <h1 className="mt-2 text-[22px] font-extrabold text-[#1a2024]">{title}</h1>
           <p className="mt-2 text-[13px] leading-relaxed text-[#7e808c]">{description}</p>

@@ -8,8 +8,7 @@ export type MetaEventName =
   | "Search"
   | "AddToCart"
   | "InitiateCheckout"
-  | "AddPaymentInfo"
-  | "Purchase";
+  | "AddPaymentInfo";
 
 export interface MetaEventData {
   content_ids?: string[];
@@ -104,20 +103,4 @@ export function trackMetaEvent(
   });
 
   return eventId;
-}
-
-export function trackMetaEventOnce(
-  storageKey: string,
-  eventName: MetaEventName,
-  customData: MetaEventData
-): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (window.localStorage.getItem(storageKey)) return;
-    const eventId = makeEventId();
-    window.localStorage.setItem(storageKey, eventId);
-    trackMetaEvent(eventName, customData, eventId);
-  } catch (error) {
-    console.error("Could not persist Meta event deduplication state:", error);
-  }
 }

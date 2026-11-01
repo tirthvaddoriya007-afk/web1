@@ -1,19 +1,20 @@
 // =============================================================================
-// BRAND CONFIG — single source of truth for all branding.
-// Change these values to rebrand the entire app. Nothing else needs editing.
-// The reference site impersonated a real brand; this clone ships a neutral
-// placeholder identity that you replace with your own here.
+// BRAND CONFIG — single source of truth for store branding and seller details.
 // =============================================================================
 
 export const brand = {
   // Shown in the header, titles, footer, everywhere.
-  name: "Mega sale",
-  tagline: "Sale Sale Sale",
+  name: "MEGA SALE",
+  logoPath: "/mega-sale-logo.png",
+  tagline: "Online Store",
+  siteUrl: "https://megasale-nine.vercel.app",
 
-  // Logo: the Meesho wordmark extracted from
-  // lavender-chimpanzee-574483.hostingersite.com/index.html. The header
-  // renders this image whenever logoSrc is set.
-  logoSrc: "/meesho-logo.png" as string,
+  seller: {
+    legalName: "SHK Enterprise",
+    proprietor: "V.M. Patel",
+    address: "Pragati IT Park, Yogichowk, Surat, Gujarat 395011, India",
+    gstin: null,
+  },
 
   // Theme colors (kept in sync with tailwind.config.ts `brand` palette).
   colors: {
@@ -25,13 +26,13 @@ export const brand = {
   currency: "₹",
 
   // Promo strip text (marquee).
-  promo: "Get Upto 80% off on all products! Limited time offer.",
+  promo: "Browse products across our store.",
 
   // Support contact shown on the Help page.
   support: {
-    email: "tirthvaddoriya007@gmail.com",
-    whatsapp: "+91 81605 64944",
-    hours: "Mon–Sat, 10am – 7pm",
+    email: "shkenterprise2023@gmail.com",
+    whatsapp: "+91 8160564944",
+    hours: "10:00 AM–5:00 PM",
   },
 };
 

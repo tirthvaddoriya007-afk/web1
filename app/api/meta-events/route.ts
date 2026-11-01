@@ -10,7 +10,6 @@ const ALLOWED_EVENTS = new Set([
   "AddToCart",
   "InitiateCheckout",
   "AddPaymentInfo",
-  "Purchase",
 ]);
 
 interface MetaEventRequest {

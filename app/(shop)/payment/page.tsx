@@ -1,4 +1,5 @@
 import { getUpiConfig } from "@/lib/settings";
+import { upiConfigured } from "@/lib/upi";
 import PaymentClient from "./PaymentClient";
 
 // ISR: rendered once, served from the CDN for 1 hour. A UPI ID saved in /admin
@@ -7,5 +8,5 @@ export const revalidate = 3600;
 
 export default async function PaymentPage() {
   const upi = await getUpiConfig();
-  return <PaymentClient upi={upi} />;
+  return <PaymentClient upiReady={upiConfigured(upi)} />;
 }

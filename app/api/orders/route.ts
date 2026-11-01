@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Address, CartItem, Order } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getUpiConfig } from "@/lib/settings";
+import { buildUpiLink, isUpiApp, type UpiApp } from "@/lib/upi";
 
 export const runtime = "nodejs";
 
-const PAYMENT_MODES = new Set(["Cash on Delivery"]);
+const COD_MODE = "Cash on Delivery";
+const PAYMENT_MODE_FOR_APP: Record<UpiApp, string> = {
+  gpay: "UPI - Google Pay",
+  phonepe: "UPI - PhonePe",
+  paytm: "UPI - Paytm",
+};
+const PAYMENT_MODES = new Set([COD_MODE, ...Object.values(PAYMENT_MODE_FOR_APP)]);
 const MAX_ITEMS = 50;
 const MAX_QUANTITY = 50;
 const MAX_TOTAL_ITEMS = 100;
@@ -14,6 +22,8 @@ interface CreateOrderRequest {
   items: { hash: string; qty: number; size?: string }[];
   address: Address;
   paymentMode: string;
+  upiApp: UpiApp;
+  metaMeasurementConsent: boolean;
 }
 
 function isAddress(value: unknown): value is Address {
@@ -44,7 +54,10 @@ function isOrderRequest(value: unknown): value is CreateOrderRequest {
       (item.size === undefined || (typeof item.size === "string" && /^(S|M|L|XL|XXL|XXXL)$/.test(item.size)))
     ) &&
     isAddress(request.address) &&
-    typeof request.paymentMode === "string" && PAYMENT_MODES.has(request.paymentMode)
+    typeof request.paymentMode === "string" && PAYMENT_MODES.has(request.paymentMode) &&
+    isUpiApp(request.upiApp) &&
+    (request.paymentMode === COD_MODE || PAYMENT_MODE_FOR_APP[request.upiApp] === request.paymentMode) &&
+    typeof request.metaMeasurementConsent === "boolean"
   );
 }
 
@@ -77,6 +90,12 @@ export async function POST(request: NextRequest) {
 
   const totalItems = payload.items.reduce((sum, item) => sum + item.qty, 0);
   if (totalItems > MAX_TOTAL_ITEMS) return responseError("Too many items in this order.", 400);
+
+  const upi = await getUpiConfig();
+  if (!upi.vpa || !upi.vpa.includes("@")) {
+    console.error("Order creation is unavailable because UPI payment settings are not configured.");
+    return responseError("UPI payments are not configured. Please contact support.", 503);
+  }
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error("Order persistence is not configured: Supabase server credentials are missing.");
@@ -120,19 +139,42 @@ export async function POST(request: NextRequest) {
     }
 
     const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-    const discountPercent = totalItems >= 4 ? 30 : totalItems === 3 ? 20 : totalItems === 2 ? 10 : 0;
-    const total = round2(subtotal - round2((subtotal * discountPercent) / 100));
+    const total = round2(subtotal);
+    if (total <= 0) return responseError("Order total must be greater than zero.", 400);
+    const isCod = payload.paymentMode === COD_MODE;
+    const advanceAmount = isCod ? round2(Math.min(100, total)) : total;
+    const balanceDue = round2(total - advanceAmount);
     const placedAt = new Date().toISOString();
+    const id = `OD${crypto.randomUUID().replace(/-/g, "").toUpperCase()}`;
     const order: Order = {
-      id: `OD${crypto.randomUUID().replace(/-/g, "").toUpperCase()}`,
+      id,
       items,
       total,
+      advanceAmount,
+      balanceDue,
       address: payload.address,
       paymentMode: payload.paymentMode,
-      status: "Confirmed",
+      paymentStatus: "Pending",
+      status: isCod ? "Awaiting advance" : "Awaiting payment",
       placedAt,
     };
+    const paymentLink = buildUpiLink({
+      config: upi,
+      amount: advanceAmount,
+      orderId: id,
+      app: payload.upiApp,
+      purpose: isCod ? "COD advance" : "Order payment",
+    });
+    const fallbackPaymentLink = buildUpiLink({
+      config: upi,
+      amount: advanceAmount,
+      orderId: id,
+      purpose: isCod ? "COD advance" : "Order payment",
+    });
 
+    const cookies = request.cookies;
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const clientIp = forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip");
     const { error: insertError } = await supabase.from("orders").insert({
       id: order.id,
       customer_name: order.address.name.trim(),
@@ -140,9 +182,21 @@ export async function POST(request: NextRequest) {
       address: order.address,
       items: order.items,
       total: order.total,
+      advance_amount: order.advanceAmount,
+      balance_due: order.balanceDue,
       payment_mode: order.paymentMode,
       status: order.status,
+      payment_status: order.paymentStatus,
       placed_at: order.placedAt,
+      meta_measurement_consent: payload.metaMeasurementConsent,
+      ...(payload.metaMeasurementConsent
+        ? {
+            meta_fbp: cookies.get("_fbp")?.value ?? null,
+            meta_fbc: cookies.get("_fbc")?.value ?? null,
+            meta_client_ip: clientIp,
+            meta_user_agent: request.headers.get("user-agent"),
+          }
+        : {}),
     });
 
     if (insertError) {
@@ -150,7 +204,7 @@ export async function POST(request: NextRequest) {
       return responseError("Could not save your order. Please try again.", 502);
     }
 
-    return NextResponse.json({ order }, { status: 201 });
+    return NextResponse.json({ order, paymentLink, fallbackPaymentLink }, { status: 201 });
   } catch (error) {
     console.error("Order creation failed:", error);
     return responseError("Could not save your order. Please try again.", 500);

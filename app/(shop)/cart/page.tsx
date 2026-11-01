@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useStore, tierPct } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
 import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export default function CartPage() {
-  const { items, count, total, comboDiscount, payable, setQty, removeItem, ready } = useStore();
-  const pct = tierPct(count);
+  const { items, count, total, payable, setQty, removeItem, ready } = useStore();
 
   if (ready && items.length === 0) {
     return (
@@ -46,7 +45,6 @@ export default function CartPage() {
             </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[15px] font-bold text-[#1a2024]">₹{Math.round(i.price)}</span>
-              <span className="text-[13px] text-[#9b9b9b] line-through">₹{Math.round(i.mrp)}</span>
             </div>
             <div className="flex items-center justify-between mt-5">
               <span className="text-[13px] text-[#535766]">
@@ -70,26 +68,6 @@ export default function CartPage() {
 
       {/* Price block */}
       <div className="bg-white mt-2 px-4 py-4">
-        {count > 0 && (
-          pct > 0 ? (
-            <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-[#eafaf3] px-2.5 py-2.5 text-[13px] font-bold text-[#038d63]">
-              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
-                <circle cx="8" cy="8" r="8" fill="#038d63" />
-                <path d="M4.5 8.5l2.4 2.4L11.5 6" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Buy Any {Math.min(count, 4)} · {pct}% OFF applied — you save {formatPrice(comboDiscount)}
-            </div>
-          ) : (
-            <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-[#fff0fc] px-2.5 py-2.5 text-[13px] font-bold" style={{ color: "var(--brand)" }}>
-              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden>
-                <circle cx="8" cy="8" r="8" fill="#9f2089" />
-                <circle cx="8" cy="4.6" r="1" fill="#fff" />
-                <rect x="7.2" y="6.6" width="1.6" height="5" rx="0.8" fill="#fff" />
-              </svg>
-              Add 1 more item to get 10% OFF
-            </div>
-          )
-        )}
         <div className="flex justify-between text-[14px] py-1.5">
           <span className="text-[#333]">Shipping:</span>
           <span className="font-semibold text-[#1ba672]">FREE</span>
@@ -100,20 +78,11 @@ export default function CartPage() {
           <span className="text-[#333]">Total Product Price:</span>
           <span className="font-semibold">{formatPrice(total)}</span>
         </div>
-        {comboDiscount > 0 && (
-          <div className="flex justify-between text-[14px] py-1.5 text-[#1ba672]">
-            <span>Offers applied:</span>
-            <span className="font-semibold">- {formatPrice(comboDiscount)}</span>
-          </div>
-        )}
         <div className="flex justify-between text-[15px] font-bold pt-4">
           <span>Order Total :</span>
           <span>{formatPrice(payable)}</span>
         </div>
       </div>
-
-      {/* Safety card */}
-      <SafetyCard />
 
       {/* Bottom bar */}
       <div className="action-bar items-center">
@@ -144,20 +113,6 @@ export default function CartPage() {
           Continue
         </Link>
       </div>
-    </div>
-  );
-}
-
-// The whole safety card is a single supplied asset in /public/banners.
-function SafetyCard() {
-  return (
-    <div className="bg-white mt-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/banners/1588578650850.webp"
-        alt="Your Safety, Our Priority — we make sure that your package is safe at every point of contact."
-        className="w-full block"
-      />
     </div>
   );
 }

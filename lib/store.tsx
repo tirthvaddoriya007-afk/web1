@@ -11,8 +11,6 @@ interface StoreCtx {
   items: CartItem[];
   count: number;
   total: number;
-  mrpTotal: number;
-  comboDiscount: number;
   payable: number;
   addItem: (p: Product, qty?: number, size?: string) => void;
   removeItem: (hash: string, size?: string) => void;
@@ -49,17 +47,6 @@ function write(key: string, value: unknown) {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/**
- * Whole-cart combo ladder: total units across ALL products decide one flat %
- * off the cart total — 1 → 0%, 2 → 10%, 3 → 20%, 4+ → 30% (capped).
- */
-export function tierPct(count: number): number {
-  if (count >= 4) return 30;
-  if (count === 3) return 20;
-  if (count === 2) return 10;
-  return 0;
-}
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -117,10 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const mrpTotal = items.reduce((s, i) => s + i.mrp * i.qty, 0);
   const count = items.reduce((s, i) => s + i.qty, 0);
-  // Whole-cart combo: one flat % off the cart total based on total units.
-  const comboDiscount = round2((total * tierPct(count)) / 100);
 
   const saveOrder = useCallback(
     (order: Order) => {
@@ -132,12 +116,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const payable = round2(total - comboDiscount);
+  const payable = round2(total);
 
   return (
     <Ctx.Provider
       value={{
-        items, count, total, mrpTotal, comboDiscount, payable,
+        items, count, total, payable,
         addItem, removeItem, setQty, clear,
         address, saveAddress, orders, currentOrder, saveOrder, ready,
         cartOpen,

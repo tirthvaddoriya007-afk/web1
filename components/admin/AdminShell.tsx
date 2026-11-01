@@ -31,6 +31,16 @@ const NAV = [
     ),
   },
   {
+    href: "/admin/orders",
+    label: "Orders",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 4h16v16H4z" />
+        <path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/categories",
     label: "Categories",
     icon: (

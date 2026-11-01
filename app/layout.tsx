@@ -4,10 +4,6 @@ import { Manrope } from "next/font/google";
 // @ts-ignore
 import "./globals.css";
 
-// Manrope — closest free match to the reference's licensed "Mier" typeface.
-// Mier is a geometric humanist sans; Manrope shares its narrow proportions and
-// flat terminals, where Mulish (used previously) rendered wider and heavier at
-// the same size/weight, making 18px "book" text look bold.
 const appFont = Manrope({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -17,8 +13,9 @@ const appFont = Manrope({
 import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: `${brand.tagline} - ${brand.name}`,
-  description: `${brand.name} — on groceries, fashion, electronics and more.`,
+  metadataBase: new URL(brand.siteUrl),
+  title: `${brand.name} | ${brand.tagline}`,
+  description: `Browse products at ${brand.name}.`,
 };
 
 export const viewport: Viewport = {
@@ -27,25 +24,6 @@ export const viewport: Viewport = {
   themeColor: brand.colors.primary,
 };
 
-// Phone-only gate, client-side. Runs before first paint so desktop/tablet
-// visitors see the loader immediately — same UX as the old middleware
-// rewrite, but it costs Vercel zero edge invocations (middleware now only
-// guards /admin). Crawlers and bots are exempt, so SEO/link previews still
-// see the real storefront. Mirrors lib/ua.ts isPhone/isCrawler exactly.
-const deviceGate = `
-(function () {
-  var path = location.pathname;
-  if (path === "/mobile-only" || path.indexOf("/admin") === 0) return;
-  var ua = navigator.userAgent || "";
-  if (/bot|crawl|spider|slurp|preview|headless|phantom|lighthouse|pingdom|uptime|bytespider|gptbot|semrush|ahrefs|facebookexternalhit|metaexternalagent|whatsapp|telegram|pinterest|linkedin|discord|viber/i.test(ua)) return;
-  var s = ua.toLowerCase();
-  if (/ipad|macintosh|tablet/i.test(s)) { location.replace("/mobile-only"); return; }
-  if (!/iphone|ipod|android[\\s\\S]*?mobile|windows phone|iemobile|blackberry|opera mini|webos/i.test(s)) {
-    location.replace("/mobile-only");
-  }
-})();
-`;
-
 // Root layout is intentionally bare: the storefront chrome lives in
 // app/(shop)/layout.tsx and the admin panel has its own shell, so /admin
 // does not inherit the header, bottom nav or cart drawer.
@@ -53,8 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-IN" className={appFont.variable}>
       <body>
-        {/* First element in <body>: runs synchronously before any paint. */}
-        <script dangerouslySetInnerHTML={{ __html: deviceGate }} />
         {children}
       </body>
     </html>

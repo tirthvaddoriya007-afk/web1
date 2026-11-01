@@ -69,10 +69,6 @@ export default function AccountPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 7h12l-1 13H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>
           {brand.name}
         </span>
-        <span className="flex items-center gap-1 bg-[#f7ecf5] text-[#60014a] text-[11px] font-semibold px-2.5 py-1 rounded-full">
-          <svg width="12" height="14" viewBox="0 0 17 20" fill="none"><path d="M8.5 1L1 3.5v6C1 14.5 4.4 17.5 8.5 19c4.1-1.5 7.5-4.5 7.5-9.5v-6L8.5 1z" fill="#60014A" /></svg>
-          Buyer Protection
-        </span>
       </div>
 
       {/* Profile card */}

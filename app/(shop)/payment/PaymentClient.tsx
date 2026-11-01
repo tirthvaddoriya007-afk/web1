@@ -1,163 +1,83 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
-import PaymentPendingModal, { type PaymentPopupState } from "@/components/PaymentPendingModal";
-import { buildUpiLink, upiConfigured, type UpiApp, type UpiConfig } from "@/lib/upi";
-import { trackMetaEvent } from "@/lib/meta-pixel";
+import type { UpiApp } from "@/lib/upi";
 import type { Order } from "@/lib/types";
 
-type Method = "gpay" | "phonepe" | "paytm" | "cod";
+const UPI_OPTIONS: { app: UpiApp; label: string; icon: string }[] = [
+  { app: "gpay", label: "Google Pay", icon: "/banners/gpa.png" },
+  { app: "phonepe", label: "PhonePe", icon: "/banners/phonepe.png" },
+  { app: "paytm", label: "Paytm", icon: "/banners/pam.png" },
+];
 
-const LABELS: Record<Method, string> = {
-  gpay: "UPI · Google Pay",
-  phonepe: "UPI · PhonePe",
-  paytm: "UPI · Paytm",
-  cod: "Cash on Delivery",
+const COD_MODE = "Cash on Delivery";
+const modeForApp: Record<UpiApp, string> = {
+  gpay: "UPI - Google Pay",
+  phonepe: "UPI - PhonePe",
+  paytm: "UPI - Paytm",
 };
 
-export default function PaymentClient({ upi }: { upi: UpiConfig }) {
-  const { items, total, comboDiscount, payable, address, saveOrder, ready } = useStore();
+export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
+  const { items, total, payable, address, saveOrder, ready } = useStore();
   const router = useRouter();
-
-  // No UPI ID saved in the admin panel yet — COD is the only workable option.
-  const upiReady = upiConfigured(upi);
-  const [method, setMethod] = useState<Method>(upiReady ? "phonepe" : "cod");
-  const [placing, setPlacing] = useState(false);
-  const [orderError, setOrderError] = useState("");
-  // "opening" = spinner popup during hand-off; "incomplete" = the "Payment
-  // not completed?" popup shown when the user comes back from the UPI app.
-  const [popup, setPopup] = useState<PaymentPopupState | null>(null);
-  // True once the UPI deep link has been fired; guards the return listeners.
-  const handedOff = useRef(false);
-  const paymentInfoTracked = useRef(false);
-
-  const trackPaymentInfo = (selectedMethod: Method) => {
-    if (paymentInfoTracked.current) return;
-    paymentInfoTracked.current = true;
-    trackMetaEvent("AddPaymentInfo", {
-      content_ids: items.map((item) => item.hash),
-      content_type: "product",
-      contents: items.map((item) => ({
-        id: item.hash,
-        quantity: item.qty,
-        item_price: item.price,
-      })),
-      value: payable,
-      currency: "INR",
-      payment_method: selectedMethod,
-    });
-  };
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  const [paymentLink, setPaymentLink] = useState("");
+  const [fallbackPaymentLink, setFallbackPaymentLink] = useState("");
+  const [selectedMode, setSelectedMode] = useState<string>(COD_MODE);
+  const [codApp, setCodApp] = useState<UpiApp>("gpay");
+  const [allowMetaMeasurement, setAllowMetaMeasurement] = useState(false);
+  const [paymentAcknowledged, setPaymentAcknowledged] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [canContinue, setCanContinue] = useState(false);
+  const [error, setError] = useState("");
+  const selectedApp = selectedMode === COD_MODE
+    ? codApp
+    : UPI_OPTIONS.find(({ app }) => modeForApp[app] === selectedMode)?.app ?? "gpay";
+  const isCod = selectedMode === COD_MODE;
+  const paymentAmount = isCod ? Math.round(Math.min(100, payable) * 100) / 100 : payable;
+  const balanceDue = Math.round((payable - paymentAmount) * 100) / 100;
 
   useEffect(() => {
-    if (ready && !popup && (items.length === 0 || !address)) router.replace("/cart");
-  }, [ready, popup, items.length, address, router]);
+    if (ready && !pendingOrder && (items.length === 0 || !address)) router.replace("/cart");
+  }, [ready, pendingOrder, items.length, address, router]);
 
-  /**
-   * While the "opening" popup is up, watch page visibility to detect the UPI
-   * round-trip:
-   *   • the page goes hidden (user actually left for the payment app) and
-   *     then comes back visible → switch the popup to "Payment not
-   *     completed?" — ANY return does this, no order is placed here.
-   *   • a bfcache `pageshow` restore counts as a real return too.
-   *   • if the page NEVER went hidden within 2s, the deep link failed (app
-   *     not installed / scheme blocked) → close the popup and leave the user
-   *     on the payment page with their method and amount intact.
-   */
   useEffect(() => {
-    if (popup !== "opening") return;
-
-    let leftPage = false;
-
-    const markIncomplete = () => {
-      if (!handedOff.current) return;
-      setPopup("incomplete");
+    if (!pendingOrder) return;
+    const timer = window.setTimeout(() => setCanContinue(true), 1800);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") setCanContinue(true);
     };
-
-    const backToPayment = () => {
-      setPopup(null);
-      setPlacing(false);
-      handedOff.current = false;
-    };
-
-    const onVis = () => {
-      if (document.visibilityState === "hidden") {
-        leftPage = true;
-      } else if (document.visibilityState === "visible" && leftPage) {
-        markIncomplete();
-      }
-    };
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (!e.persisted) return;
-      markIncomplete();
-    };
-
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("pageshow", onPageShow);
-    const timer = window.setTimeout(() => {
-      if (!leftPage && document.visibilityState === "visible") backToPayment();
-    }, 2000);
-
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("pageshow", onPageShow);
       window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [popup]);
+  }, [pendingOrder]);
 
-  /**
-   * Fire the deep link for the given app — the exact same redirection as
-   * before (PhonePe collect screen for gpay/phonepe, Paytm cash-wallet for
-   * paytm). The spinner popup opens on the same tick so the user sees
-   * "Opening payment app..." while the OS switches apps.
-   */
-  const handoff = (app: Method) => {
-    const appLink = buildUpiLink({ config: upi, app: app as UpiApp, amount: payable });
-
-    handedOff.current = true;
-    setPlacing(true);
-    setPopup("opening");
-
-    try {
-      window.location.assign(appLink);
-    } catch {
-      /* no-op: the 2s fallback returns the user to the payment page */
-    }
+  const openPaymentApp = (link: string) => {
+    if (!link) return;
+    window.location.assign(link);
+    window.setTimeout(() => setCanContinue(true), 1800);
   };
 
-  /**
-   * Tap-to-pay: selecting a DIFFERENT UPI option fires the hand-off to that
-   * app instantly — no Pay Now tap needed. Same-option taps only select, and
-   * COD (the no-UPI fallback) stays button-driven so an order is never placed
-   * by accident.
-   */
-  const selectMethod = (k: Method) => {
-    setMethod(k);
-    if (k === "cod" || !upiReady || k === method) return;
-    trackPaymentInfo(k);
-    snapshotFirstOrder();
-    handoff(k);
-  };
-
-  const pay = () => {
-    trackPaymentInfo(method);
-    if (method === "cod") {
-      setPlacing(true);
-      setOrderError("");
-      setTimeout(() => { void submitOrder(LABELS.cod); }, 700);
+  const createOrderAndPay = async () => {
+    if (!paymentAcknowledged) {
+      setError("Please confirm that you understand the payment terms before continuing.");
       return;
     }
 
-    // UPI: store a one-time snapshot of this first order (mirrors the
-    // reference store's Ordered* keys), then hand off to the chosen app.
-    snapshotFirstOrder();
-    handoff(method);
-  };
+    if (!upiReady) {
+      setError("UPI payments are not configured. Please contact support before placing an order.");
+      return;
+    }
 
-  const submitOrder = async (paymentMode: string) => {
+    setProcessing(true);
+    setError("");
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -165,54 +85,32 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
         body: JSON.stringify({
           items: items.map(({ hash, qty, size }) => ({ hash, qty, size })),
           address,
-          paymentMode,
+          paymentMode: isCod ? COD_MODE : selectedMode,
+          upiApp: selectedApp,
+          metaMeasurementConsent: allowMetaMeasurement,
         }),
       });
       const result = await response.json().catch(() => null) as
-        | { order?: Order; error?: string }
+        | { order?: Order; paymentLink?: string; fallbackPaymentLink?: string; error?: string }
         | null;
-      if (!response.ok || !result?.order) {
+      if (!response.ok || !result?.order || !result.paymentLink || !result.fallbackPaymentLink) {
         throw new Error(result?.error || "Order could not be saved.");
       }
 
+      setPendingOrder(result.order);
+      setPaymentLink(result.paymentLink);
+      setFallbackPaymentLink(result.fallbackPaymentLink);
       saveOrder(result.order);
-      router.replace(`/summary?order=${encodeURIComponent(result.order.id)}`);
-    } catch (error) {
-      console.error("Could not place order:", error);
-      setOrderError(error instanceof Error ? error.message : "Order could not be saved. Please try again.");
-      setPlacing(false);
+      openPaymentApp(result.paymentLink);
+    } catch (cause) {
+      console.error("Could not create order:", cause);
+      setError(cause instanceof Error ? cause.message : "Order could not be saved. Please try again.");
+      setProcessing(false);
     }
   };
 
-  // Mirrors the reference store: the first order ever placed is snapshotted
-  // into Ordered* localStorage keys (used by the home/account "last order"
-  // reorder UI). Subsequent orders leave the snapshot untouched.
-  const snapshotFirstOrder = () => {
-    try {
-      if (window.localStorage.getItem("OrderPurchaseCount") === "1") return;
-      const products = window.localStorage.getItem("products");
-      const totalAmount = window.localStorage.getItem("TotalcartTotalAmount");
-      const cartAmount = window.localStorage.getItem("cartTotalAmount");
-      window.localStorage.setItem("OrderPurchaseCount", "1");
-      if (products) window.localStorage.setItem("OrderedProducts", products);
-      if (totalAmount) window.localStorage.setItem("OrderedTotalcartTotalAmount", totalAmount);
-      if (cartAmount) window.localStorage.setItem("OrderedcartTotalAmount", cartAmount);
-    } catch {
-      /* localStorage unavailable — snapshot is best-effort */
-    }
-  };
-
-  const tryAgain = () => {
-    // Same selected method and amount — restart the flow: spinner popup +
-    // hand off to the same payment app again.
-    handoff(method);
-  };
-
-  const cancel = () => {
-    // Stay on the payment page — selected method and amount are untouched.
-    setPopup(null);
-    setPlacing(false);
-    handedOff.current = false;
+  const continueToStatus = () => {
+    if (pendingOrder) router.replace(`/summary?order=${encodeURIComponent(pendingOrder.id)}`);
   };
 
   return (
@@ -221,187 +119,214 @@ export default function PaymentClient({ upi }: { upi: UpiConfig }) {
         <CheckoutSteps active={3} />
       </div>
 
-      {/* Header row — .gNFCeh: padding 16px 16px 18px; title .hEBjyt 17px/20px
-          bold #353543; the safe-payments mark is grey #8B8BA3 over two lines */}
-      <div className="bg-white mt-2 flex items-start justify-between pt-4 px-4 pb-[18px]">
-        <h2 className="font-bold text-[17px] leading-5 text-[#353543] m-0">Select Payment Method</h2>
-        <span className="flex items-center gap-1.5 shrink-0">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="#ADC6FF" aria-hidden>
-            <path d="M12 2l8 3v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V5l8-3z" />
-            <path d="M8.4 11.9l2.2 2.2 4.6-4.6" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-[10px] font-semibold leading-[13px] text-[#8b8ba3]">
-            100% SAFE
-            <br />
-            PAYMENTS
-          </span>
-        </span>
-      </div>
-
-      {/* Extra off banner — .cHsEym padding 0 16px 18px; .efQsfx bg #E7EEFF,
-          radius 4px, padding 6px 12px, gap 10px; text 15px/20px 600 #5585F8 */}
-      <div className="bg-white px-4 pb-[18px]" hidden={!upiReady}>
-        <div className="flex items-center justify-start gap-[10px] rounded bg-[#e7eeff] px-3 py-1.5">
-          {/* .eVDQPI — 60×60, padding-left 10px (muted is required for the
-              browser to honour autoplay) */}
-          <video
-            src="/banners/cod_lat.webm"
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="flex h-[60px] w-[60px] items-center pl-2.5"
-          />
-          <span className="text-[15px] font-semibold leading-5 text-[#5585f8]">
-            Pay online &amp; get EXTRA ₹33 off
-          </span>
-        </div>
-      </div>
-
-      {/* Pay online / UPI accordion */}
-      <div className="bg-white">
-        {upiReady && (
-          <>
-            {/* .GmPbS — padding 6px 16px, gap 10px, label 10px/600, rule fills */}
-            <div className="flex items-center gap-[10px] bg-white px-4 py-1.5">
-              <span className="text-[10px] font-semibold text-[#353543]">PAY ONLINE</span>
-              <div className="h-px flex-grow bg-[#cecede]" />
+      {pendingOrder ? (
+        <section className="bg-white mt-2 px-4 py-6">
+          <h1 className="text-[19px] font-extrabold text-[#1a2024]">Payment verification pending</h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-[#535766]">
+            Order {pendingOrder.id} is saved, but is not confirmed yet. Complete the
+            {pendingOrder.paymentMode === COD_MODE ? " advance" : " payment"} in your UPI app.
+            We will confirm the order after manually verifying the transfer.
+          </p>
+          <div className="mt-4 rounded-xl bg-[#f7f7f9] p-4 text-[14px]">
+            <div className="flex justify-between gap-3">
+              <span>{pendingOrder.paymentMode === COD_MODE ? "UPI advance" : "UPI payment"}</span>
+              <strong>{formatPrice(pendingOrder.advanceAmount)}</strong>
             </div>
-
-            <div className="px-4">
-              <div className="flex items-center gap-2 py-3 border-b">
-                <span className="bg-[#5b6cf0] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">UPI</span>
-                <span className="text-[15px] flex-1 text-[#353543]">UPI(GPay/PhonePe/Paytm)</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#777" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+            {pendingOrder.paymentMode === COD_MODE && (
+              <div className="mt-2 flex justify-between gap-3">
+                <span>Balance due on delivery</span>
+                <strong>{formatPrice(pendingOrder.balanceDue)}</strong>
               </div>
-
-              <UpiRow k="gpay" label="G Pay" method={method} set={selectMethod} logo={<GPayLogo />} />
-              <UpiRow k="phonepe" label="PhonePe" method={method} set={selectMethod}
-                note={<span className="text-[11px] text-[red]">25% Cashback in 24 hour</span>}
-                logo={<PhonePeLogo />} labelColor="green" />
-              <UpiRow k="paytm" label="Paytm" method={method} set={selectMethod}
-                note={<span className="text-[11px] text-[green]">20% Cashback in 24 hour</span>}
-                logo={<PaytmLogo />} />
-            </div>
-          </>
-        )}
-
-        {/* COD is the fallback when no UPI ID is configured — the reference
-            screen only ever shows the UPI list. */}
-        {!upiReady && (
-          <div className="px-4">
-            <UpiRow k="cod" label="Cash on Delivery" method={method} set={selectMethod}
-              note={<span className="text-[11px] text-[#9b9b9b]">Pay when your order arrives</span>} />
+            )}
+            <p className="mt-3 border-t border-[#e5e5eb] pt-3 text-[12px] text-[#535766]">
+              Your payment app will show the recipient and amount before you approve the transfer.
+              Payments are manually verified; returning here does not confirm payment.
+            </p>
           </div>
-        )}
-      </div>
-
-      {/* Price block — .cart__footer has 5px #eaeaf2 rules top and bottom */}
-      <div className="bg-white mt-2 px-4 py-4 border-y-[5px] border-[#eaeaf2]">
-        <div className="flex justify-between text-[14px] py-1.5">
-          <span>Shipping:</span>
-          <span className="font-semibold">FREE</span>
-        </div>
-        <div className="flex justify-between text-[14px] py-1.5">
-          <span>Total Product Price:</span>
-          <span className="font-semibold">{formatPrice(total)}</span>
-        </div>
-        {comboDiscount > 0 && (
-          <div className="flex justify-between text-[14px] py-1.5 text-[#1ba672]">
-            <span>Offers applied:</span>
-            <span className="font-semibold">- {formatPrice(comboDiscount)}</span>
-          </div>
-        )}
-        {/* solid grey separator here (the cart's dashed rule is a different div) */}
-        <div className="h-px bg-[#eaeaf2] mt-3 mb-1" />
-        <div className="flex justify-between text-[15px] font-bold py-3">
-          <span>Order Total :</span>
-          <span>{formatPrice(payable)}</span>
-        </div>
-      </div>
-
-      {/* Bottom bar — .eGwEyP padding 12px 16px; left half .dUijPM (amount
-          17px/20px 700 #353543, link 13px/16px 700 #9F2089), right half 50% */}
-      <div className="action-bar items-center">
-        <div className="flex-1 max-w-[50%] pr-2">
-          <div className="text-[17px] font-bold leading-5 text-[#353543]">{formatPrice(payable)}</div>
-          <button className="text-[13px] font-bold leading-4 tracking-[0.0015em] text-left" style={{ color: "var(--brand)" }}>
-            VIEW PRICE DETAILS
+          <button
+            type="button"
+            className="mt-4 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
+            onClick={() => openPaymentApp(paymentLink)}
+          >
+            Reopen {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"} app
           </button>
-        </div>
-        <button className="btn-brand" onClick={pay} disabled={placing}>
-          {placing ? "Processing..." : method === "cod" ? "Place Order" : "PayNow"}
-        </button>
-      </div>
-      {orderError && (
-        <p role="alert" className="px-4 pb-4 text-[13px] text-red-600">
-          {orderError}
-        </p>
-      )}
+          <button
+            type="button"
+            className="mt-2 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
+            onClick={() => openPaymentApp(fallbackPaymentLink)}
+          >
+            Choose another UPI app
+          </button>
+          {canContinue && (
+            <button type="button" className="btn-brand mt-3 w-full" onClick={continueToStatus}>
+              View order status
+            </button>
+          )}
+          <p className="mt-3 text-[12px] leading-relaxed text-[#777]">
+            Do not pay again if you already completed the transfer. The order remains pending until we verify it.
+          </p>
+        </section>
+      ) : (
+        <>
+          <section className="bg-white mt-2 px-4 py-5">
+            <h1 className="text-[18px] font-extrabold text-[#1a2024]">Choose how to pay</h1>
+            <p className="mt-2 text-[13px] leading-relaxed text-[#535766]">
+              Pay the full order total by UPI, or choose Cash on Delivery with a UPI advance of up to ₹100.
+              Transfers are manually verified before an order is confirmed.
+            </p>
+          </section>
 
-      <PaymentPendingModal
-        open={popup !== null}
-        state={popup ?? "opening"}
-        onTryAgain={tryAgain}
-        onCancel={cancel}
-      />
+          <section className="mt-2 bg-white px-4 py-4">
+            <h2 className="mb-3 font-bold text-[15px] text-[#353543]">Payment method</h2>
+            <div className="space-y-2">
+              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${isCod ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}>
+                <input
+                  type="radio"
+                  name="payment-method"
+                  checked={isCod}
+                  onChange={() => setSelectedMode(COD_MODE)}
+                  className="h-4 w-4 accent-[#9f2089]"
+                />
+                <span className="flex-1">
+                  <strong className="block text-[14px] text-[#353543]">Cash on Delivery</strong>
+                  <span className="text-[12px] text-[#777]">Pay an advance of up to ₹100; the remaining balance is due on delivery</span>
+                </span>
+              </label>
+
+              {UPI_OPTIONS.map(({ app, label, icon }) => (
+                <label
+                  key={app}
+                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${selectedMode === modeForApp[app] ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}
+                >
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    checked={selectedMode === modeForApp[app]}
+                    onChange={() => setSelectedMode(modeForApp[app])}
+                    className="h-4 w-4 accent-[#9f2089]"
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={icon} alt="" className="h-9 w-9 rounded object-contain" />
+                  <span className="flex-1">
+                    <strong className="block text-[14px] text-[#353543]">{label}</strong>
+                    <span className="text-[12px] text-[#777]">Pay the full order total now</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+          </section>
+
+          <section className="bg-white mt-2 px-4 py-4">
+            <h2 className="font-bold text-[15px] text-[#353543]">Price details</h2>
+            <div className="mt-3 flex justify-between py-1.5 text-[14px]">
+              <span>Products</span><span className="font-semibold">{formatPrice(total)}</span>
+            </div>
+            <div className="flex justify-between py-1.5 text-[14px]">
+              <span>Standard shipping</span><span className="font-semibold">FREE</span>
+            </div>
+            <div className="mt-2 border-t pt-3">
+              <div className="flex justify-between py-1 text-[14px]">
+                <span>Order total</span><span className="font-bold">{formatPrice(payable)}</span>
+              </div>
+              <div className="flex justify-between py-1 text-[14px]">
+                <span>{isCod ? "Pay now by UPI" : "Pay in UPI app"}</span>
+                <span className="font-bold">{formatPrice(paymentAmount)}</span>
+              </div>
+              {isCod && (
+                <div className="flex justify-between py-1 text-[14px]">
+                  <span>Balance due on delivery</span><span className="font-bold">{formatPrice(balanceDue)}</span>
+                </div>
+              )}
+            </div>
+            {isCod && (
+              <fieldset className="mt-4 border-t pt-3">
+                <legend className="mb-2 text-[13px] font-semibold text-[#535766]">Choose an app for the advance</legend>
+                <div className="grid grid-cols-3 gap-2">
+                  {UPI_OPTIONS.map(({ app, label, icon }) => (
+                    <label
+                      key={app}
+                      className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-center ${codApp === app ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="cod-upi-app"
+                        checked={codApp === app}
+                        onChange={() => setCodApp(app)}
+                        className="h-4 w-4 accent-[#9f2089]"
+                      />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={icon} alt="" className="h-8 w-8 rounded object-contain" />
+                      <span className="text-[11px] font-semibold text-[#535766]">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+          </section>
+
+          <section className="mt-2 bg-white px-4 py-4">
+            <label className="flex items-start gap-3 text-[12px] leading-relaxed text-[#535766]">
+              <input
+                type="checkbox"
+                checked={allowMetaMeasurement}
+                onChange={(event) => setAllowMetaMeasurement(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#9f2089]"
+              />
+              <span>
+                Optional: I agree that my hashed phone number and order/browser identifiers may be shared
+                with Meta to measure advertising purchases. See our{" "}
+                <Link href="/policy/privacy" className="font-semibold underline" style={{ color: "var(--brand)" }}>
+                  privacy policy
+                </Link>.
+              </span>
+            </label>
+          </section>
+
+          {/* <section className="mt-2 bg-white px-4 py-4">
+            <label className="flex items-start gap-3 text-[12px] leading-relaxed text-[#535766]">
+              <input
+                type="checkbox"
+                required
+                checked={paymentAcknowledged}
+                onChange={(event) => setPaymentAcknowledged(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#9f2089]"
+              />
+              <span>
+                <strong className="text-[#353543]">Required:</strong>{" "}
+                I understand that UPI payments, including the COD advance, are manually verified and
+                my order will be confirmed only after the payment is verified.
+              </span>
+            </label>
+          </section> */}
+
+          {!upiReady && (
+            <p role="alert" className="mx-4 mt-3 rounded-lg bg-amber-50 p-3 text-[13px] text-amber-900">
+              UPI payments are not configured yet, so checkout is unavailable. Please contact support.
+            </p>
+          )}
+          {error && <p role="alert" className="mx-4 mt-3 text-[13px] text-red-600">{error}</p>}
+
+          <div className="action-bar items-center">
+            <div className="flex-1">
+              <div className="text-[17px] font-bold leading-5 text-[#353543]">{formatPrice(payable)}</div>
+              <span className="text-[12px] text-[#777]">Order total</span>
+            </div>
+            <button
+              type="button"
+              className="btn-brand"
+              onClick={createOrderAndPay}
+              disabled={processing || !upiReady || !address || items.length === 0 || !paymentAcknowledged}
+            >
+              {processing
+                ? "Preparing order..."
+                : isCod
+                  ? `Pay ${formatPrice(paymentAmount)} `
+                  : `Pay ${formatPrice(paymentAmount)}`}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
-}
-
-function UpiRow({
-  k, label, method, set, note, logo, labelColor,
-}: {
-  k: Method;
-  label: string;
-  method: Method;
-  set: (m: Method) => void;
-  note?: React.ReactNode;
-  logo?: React.ReactNode;
-  labelColor?: string;
-}) {
-  const active = method === k;
-  return (
-    <button onClick={() => set(k)} className="w-full flex items-center gap-3 py-3.5 border-b text-left">
-      {/* selected = filled blue ring (.IhlWp uses #5585F8); idle = grey ring
-          with a faint centre dot */}
-      <span className="w-5 h-5 rounded-full border-2 grid place-items-center shrink-0"
-        style={{ borderColor: active ? "#5585f8" : "#c4c4cf" }}>
-        <span
-          className="w-2.5 h-2.5 rounded-full"
-          style={{ background: active ? "#5585f8" : "#e4e4ec" }}
-        />
-      </span>
-      <span className="text-[15px] font-semibold" style={{ color: labelColor || "#353543" }}>{label}</span>
-      <span className="flex-1 text-right pr-1">{note}</span>
-      {logo && <span className="shrink-0">{logo}</span>}
-    </button>
-  );
-}
-
-/* Real provider marks from /public/banners. Each sits in the same 26×26 box
-   with object-contain, so the three logos line up down the column no matter
-   how differently they're cropped (GPay is wide, PhonePe round, Paytm square). */
-function ProviderLogo({ src, name }: { src: string; name: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={name}
-      width={26}
-      height={26}
-      loading="lazy"
-      decoding="async"
-      className="h-[26px] w-[26px] object-contain"
-    />
-  );
-}
-function GPayLogo() {
-  return <ProviderLogo src="/banners/gpa.png" name="Google Pay" />;
-}
-function PhonePeLogo() {
-  return <ProviderLogo src="/banners/phonepe.png" name="PhonePe" />;
-}
-function PaytmLogo() {
-  return <ProviderLogo src="/banners/pam.png" name="Paytm" />;
 }

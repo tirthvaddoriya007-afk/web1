@@ -71,7 +71,7 @@ export default function UpiSettingsForm({ initial }: { initial: UpiSettings }) {
         label="Payee name"
         value={form.upi_payee_name}
         onChange={set("upi_payee_name")}
-        placeholder={brand.name}
+        placeholder={brand.seller.legalName}
         hint="Shown inside the customer's UPI app. Keep it short."
       />
       <Field

@@ -1,5 +1,4 @@
 import { StoreProvider } from "@/lib/store";
-import { CountdownProvider } from "@/lib/countdown";
 import Header from "@/components/Header";
 import BottomNav from "@/components/BottomNav";
 import CartDrawerHost from "@/components/CartDrawerHost";
@@ -9,15 +8,13 @@ import MetaPixel from "@/components/MetaPixel";
 export default function ShopLayout({ children }: { children: React.ReactNode }) {
   return (
     <StoreProvider>
-      <CountdownProvider>
-        <MetaPixel />
-        <div className="app-shell">
-          <Header />
-          <main className="app-main">{children}</main>
-          <BottomNav />
-          <CartDrawerHost />
-        </div>
-      </CountdownProvider>
+      <MetaPixel />
+      <div className="app-shell">
+        <Header />
+        <main className="app-main">{children}</main>
+        <BottomNav />
+        <CartDrawerHost />
+      </div>
     </StoreProvider>
   );
 }

@@ -58,10 +58,15 @@ export interface Order {
   id: string;
   items: CartItem[];
   total: number;
+  advanceAmount: number;
+  balanceDue: number;
   address: Address;
   paymentMode: string;
+  paymentStatus: "Pending" | "Verified" | "Not required";
   status: string;
   placedAt: string;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
 }
 
 export interface Review {

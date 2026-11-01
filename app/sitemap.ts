@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
 import { getAllProducts, getCategories } from "@/lib/catalog";
+import { brand } from "@/lib/brand";
 
 // Generated at build time (zero runtime cost): the main routes, every
 // category and every product. Crawlers get a complete map so they stop
 // guessing URLs and hammering the feed.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = "https://big-deal.online";
+  const base = brand.siteUrl;
   const entries: MetadataRoute.Sitemap = [
     { url: base, changeFrequency: "daily", priority: 1 },
     { url: `${base}/home`, changeFrequency: "daily", priority: 1 },

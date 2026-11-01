@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import PolicyPage, { PolicySection } from "../PolicyPage";
+import { brand } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Mega sale",
-  description: "Learn how Mega sale uses information when you browse and place an order.",
+  title: `Privacy Policy | ${brand.name}`,
+  description: `Learn how ${brand.name} uses information when you browse and place an order.`,
 };
 
 export default function PrivacyPage() {
   return (
     <PolicyPage
       title="Privacy policy"
-      description="This page explains what information is used when you browse Mega sale or place an order."
+      description={`This page explains what information is used when you browse ${brand.name} or place an order.`}
     >
       <PolicySection title="Information you provide">
         <p>
@@ -38,9 +39,12 @@ export default function PrivacyPage() {
       <PolicySection title="Analytics and advertising">
         <p>
           The site uses Meta Pixel and Conversions API to measure page visits and shopping events such
-          as product views, searches, cart activity, and purchases. These services may receive event
-          details, browser and device information, IP address, and relevant Meta cookies to measure
-          advertising performance.
+          as product views, searches, and cart activity. If you opted in at checkout, a Purchase event
+          is sent after a full UPI payment is manually verified, or after a COD order with a verified
+          advance is marked delivered. For that event, your phone number is SHA-256 hashed before it is
+          sent; Meta may also receive the order details, IP address, browser information, and relevant
+          Meta cookies to measure advertising performance. Your phone number is not sent to Meta in
+          plain text for this event.
         </p>
       </PolicySection>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { brand } from "@/lib/brand";
 import { useStore } from "@/lib/store";
@@ -110,14 +111,7 @@ export default function Header() {
             </Link>
           )}
           <Link href="/home" className="flex items-center gap-2 no-underline">
-            {brand.logoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logoSrc} alt={brand.name} className="h-6 w-auto" fetchPriority="high" decoding="async" />
-            ) : (
-              <span className="text-xl font-extrabold tracking-tight" style={{ color: "var(--brand-dark)" }}>
-                {brand.name}
-              </span>
-            )}
+            <Image src={brand.logoPath} alt={brand.name} width={128} height={26} priority className="h-6 w-auto object-contain" />
           </Link>
         </div>
         <Icons />
