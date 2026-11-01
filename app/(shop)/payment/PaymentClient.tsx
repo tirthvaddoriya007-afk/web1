@@ -6,40 +6,24 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
-import type { UpiApp } from "@/lib/upi";
 import type { Order } from "@/lib/types";
 
-const UPI_OPTIONS: { app: UpiApp; label: string; icon: string }[] = [
-  { app: "gpay", label: "Google Pay", icon: "/banners/gpa.png" },
-  { app: "phonepe", label: "PhonePe", icon: "/banners/phonepe.png" },
-  { app: "paytm", label: "Paytm", icon: "/banners/pam.png" },
-];
-
 const COD_MODE = "Cash on Delivery";
-const modeForApp: Record<UpiApp, string> = {
-  gpay: "UPI - Google Pay",
-  phonepe: "UPI - PhonePe",
-  paytm: "UPI - Paytm",
-};
+const UPI_MODE = "UPI";
 
 export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
   const { items, total, payable, address, saveOrder, ready } = useStore();
   const router = useRouter();
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [paymentLink, setPaymentLink] = useState("");
-  const [fallbackPaymentLink, setFallbackPaymentLink] = useState("");
   const [paymentPopupOpen, setPaymentPopupOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<string>(COD_MODE);
-  const [codApp, setCodApp] = useState<UpiApp>("gpay");
   const [allowMetaMeasurement, setAllowMetaMeasurement] = useState(false);
   const [paymentAcknowledged, setPaymentAcknowledged] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [canContinue, setCanContinue] = useState(false);
   const [error, setError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
-  const selectedApp = selectedMode === COD_MODE
-    ? codApp
-    : UPI_OPTIONS.find(({ app }) => modeForApp[app] === selectedMode)?.app ?? "gpay";
   const isCod = selectedMode === COD_MODE;
   const paymentAmount = isCod ? Math.round(Math.min(100, payable) * 100) / 100 : payable;
   const balanceDue = Math.round((payable - paymentAmount) * 100) / 100;
@@ -61,11 +45,24 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
     };
   }, [pendingOrder]);
 
-  const openPaymentApp = (link: string) => {
-    if (!link) return;
-    window.location.assign(link);
-    window.setTimeout(() => setCanContinue(true), 1800);
-  };
+ const openPaymentApp = (link: string) => {
+  if (!link) return;
+
+  try {
+    const url = new URL(link);
+
+    if (
+      !["upi:", "phonepe:", "tez:", "paytmmp:"].includes(url.protocol)
+    ) {
+      throw new Error("Invalid payment link");
+    }
+
+    window.location.href = link;
+  } catch (error) {
+    console.error("Unable to open payment app:", error);
+    setError("Unable to open UPI app. Please try again.");
+  }
+};
 
   const createOrderAndPay = async () => {
     if (!paymentAcknowledged) {
@@ -89,20 +86,18 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
           items: items.map(({ hash, qty, size }) => ({ hash, qty, size })),
           address,
           paymentMode: isCod ? COD_MODE : selectedMode,
-          upiApp: selectedApp,
           metaMeasurementConsent: allowMetaMeasurement,
         }),
       });
       const result = await response.json().catch(() => null) as
-        | { order?: Order; paymentLink?: string; fallbackPaymentLink?: string; error?: string }
+        | { order?: Order; paymentLink?: string; error?: string }
         | null;
-      if (!response.ok || !result?.order || !result.paymentLink || !result.fallbackPaymentLink) {
+      if (!response.ok || !result?.order || !result.paymentLink) {
         throw new Error(result?.error || "Order could not be saved.");
       }
 
       setPendingOrder(result.order);
       setPaymentLink(result.paymentLink);
-      setFallbackPaymentLink(result.fallbackPaymentLink);
       saveOrder(result.order);
       setPaymentPopupOpen(true);
     } catch (cause) {
@@ -156,14 +151,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
             className="mt-4 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
             onClick={() => openPaymentApp(paymentLink)}
           >
-            Reopen {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"} app
-          </button>
-          <button
-            type="button"
-            className="mt-2 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
-            onClick={() => openPaymentApp(fallbackPaymentLink)}
-          >
-            Choose another UPI app
+            Reopen UPI app
           </button>
           {canContinue && (
             <button type="button" className="btn-brand mt-3 w-full" onClick={continueToStatus}>
@@ -201,26 +189,19 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                 </span>
               </label>
 
-              {UPI_OPTIONS.map(({ app, label, icon }) => (
-                <label
-                  key={app}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${selectedMode === modeForApp[app] ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}
-                >
-                  <input
-                    type="radio"
-                    name="payment-method"
-                    checked={selectedMode === modeForApp[app]}
-                    onChange={() => setSelectedMode(modeForApp[app])}
-                    className="h-4 w-4 accent-[#9f2089]"
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={icon} alt="" className="h-9 w-9 rounded object-contain" />
-                  <span className="flex-1">
-                    <strong className="block text-[14px] text-[#353543]">{label}</strong>
-                    <span className="text-[12px] text-[#777]">Pay the full order total now</span>
-                  </span>
-                </label>
-              ))}
+              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${!isCod ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}>
+                <input
+                  type="radio"
+                  name="payment-method"
+                  checked={!isCod}
+                  onChange={() => setSelectedMode(UPI_MODE)}
+                  className="h-4 w-4 accent-[#9f2089]"
+                />
+                <span className="flex-1">
+                  <strong className="block text-[14px] text-[#353543]">All UPI apps</strong>
+                  <span className="text-[12px] text-[#777]">Choose any UPI app to pay the full order total</span>
+                </span>
+              </label>
             </div>
 
           </section>
@@ -248,28 +229,9 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               )}
             </div>
             {isCod && (
-              <fieldset className="mt-4 border-t pt-3">
-                <legend className="mb-2 text-[13px] font-semibold text-[#535766]">Choose an app for the advance</legend>
-                <div className="grid grid-cols-3 gap-2">
-                  {UPI_OPTIONS.map(({ app, label, icon }) => (
-                    <label
-                      key={app}
-                      className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-center ${codApp === app ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="cod-upi-app"
-                        checked={codApp === app}
-                        onChange={() => setCodApp(app)}
-                        className="h-4 w-4 accent-[#9f2089]"
-                      />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={icon} alt="" className="h-8 w-8 rounded object-contain" />
-                      <span className="text-[11px] font-semibold text-[#535766]">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+              <p className="mt-4 border-t pt-3 text-[12px] text-[#777]">
+                Pay the advance using any UPI app from the UPI chooser.
+              </p>
             )}
           </section>
 
@@ -369,19 +331,9 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f7f7f9] p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={UPI_OPTIONS.find(({ app }) => app === selectedApp)?.icon ?? UPI_OPTIONS[0].icon}
-                alt=""
-                className="h-12 w-12 rounded-lg object-contain"
-              />
-              <div className="min-w-0">
-                <p className="font-bold text-[#353543]">
-                  {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"}
-                </p>
-                <p className="break-all text-xs text-[#777]">Order ID: {pendingOrder.id}</p>
-              </div>
+            <div className="mt-4 rounded-xl bg-[#f7f7f9] p-3">
+              <p className="font-bold text-[#353543]">All UPI apps</p>
+              <p className="break-all text-xs text-[#777]">Order ID: {pendingOrder.id}</p>
             </div>
 
             <div className="mt-3 space-y-2 rounded-xl border border-[#e5e5eb] p-3 text-[13px]">
@@ -411,14 +363,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               className="btn-brand mt-4 w-full"
               onClick={() => openPaymentApp(paymentLink)}
             >
-              Open {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"} and pay {formatPrice(pendingOrder.advanceAmount)}
-            </button>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
-              onClick={() => openPaymentApp(fallbackPaymentLink)}
-            >
-              Open another UPI app
+              Open UPI app and pay {formatPrice(pendingOrder.advanceAmount)}
             </button>
             <p className="mt-3 text-center text-[11px] leading-relaxed text-[#777]">
               Check the recipient and amount in your UPI app before approving. Order confirmation is

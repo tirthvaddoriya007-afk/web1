@@ -2,17 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Address, CartItem, Order } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getUpiConfig } from "@/lib/settings";
-import { buildUpiLink, isUpiApp, type UpiApp } from "@/lib/upi";
+import { buildUpiLink } from "@/lib/upi";
 
 export const runtime = "nodejs";
 
 const COD_MODE = "Cash on Delivery";
-const PAYMENT_MODE_FOR_APP: Record<UpiApp, string> = {
-  gpay: "UPI - Google Pay",
-  phonepe: "UPI - PhonePe",
-  paytm: "UPI - Paytm",
-};
-const PAYMENT_MODES = new Set([COD_MODE, ...Object.values(PAYMENT_MODE_FOR_APP)]);
+const UPI_MODE = "UPI";
+const PAYMENT_MODES = new Set([COD_MODE, UPI_MODE]);
 const MAX_ITEMS = 50;
 const MAX_QUANTITY = 50;
 const MAX_TOTAL_ITEMS = 100;
@@ -22,7 +18,6 @@ interface CreateOrderRequest {
   items: { hash: string; qty: number; size?: string }[];
   address: Address;
   paymentMode: string;
-  upiApp: UpiApp;
   metaMeasurementConsent: boolean;
 }
 
@@ -55,8 +50,6 @@ function isOrderRequest(value: unknown): value is CreateOrderRequest {
     ) &&
     isAddress(request.address) &&
     typeof request.paymentMode === "string" && PAYMENT_MODES.has(request.paymentMode) &&
-    isUpiApp(request.upiApp) &&
-    (request.paymentMode === COD_MODE || PAYMENT_MODE_FOR_APP[request.upiApp] === request.paymentMode) &&
     typeof request.metaMeasurementConsent === "boolean"
   );
 }
@@ -162,13 +155,6 @@ export async function POST(request: NextRequest) {
       config: upi,
       amount: advanceAmount,
       orderId: id,
-      app: payload.upiApp,
-      purpose: isCod ? "COD advance" : "Order payment",
-    });
-    const fallbackPaymentLink = buildUpiLink({
-      config: upi,
-      amount: advanceAmount,
-      orderId: id,
       purpose: isCod ? "COD advance" : "Order payment",
     });
 
@@ -204,7 +190,7 @@ export async function POST(request: NextRequest) {
       return responseError("Could not save your order. Please try again.", 502);
     }
 
-    return NextResponse.json({ order, paymentLink, fallbackPaymentLink }, { status: 201 });
+    return NextResponse.json({ order, paymentLink }, { status: 201 });
   } catch (error) {
     console.error("Order creation failed:", error);
     return responseError("Could not save your order. Please try again.", 500);
