@@ -28,6 +28,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [paymentLink, setPaymentLink] = useState("");
   const [fallbackPaymentLink, setFallbackPaymentLink] = useState("");
+  const [paymentPopupOpen, setPaymentPopupOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<string>(COD_MODE);
   const [codApp, setCodApp] = useState<UpiApp>("gpay");
   const [allowMetaMeasurement, setAllowMetaMeasurement] = useState(false);
@@ -80,7 +81,6 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
     setProcessing(true);
     setError("");
     setPaymentNotice("");
-    const paymentWindow = window.open("about:blank", "_blank");
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -104,14 +104,8 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
       setPaymentLink(result.paymentLink);
       setFallbackPaymentLink(result.fallbackPaymentLink);
       saveOrder(result.order);
-      if (paymentWindow) {
-        paymentWindow.location.href = result.paymentLink;
-      } else {
-        setPaymentNotice("Your order is saved. If the payment app did not open, use the button below to open it.");
-        setCanContinue(true);
-      }
+      setPaymentPopupOpen(true);
     } catch (cause) {
-      paymentWindow?.close();
       console.error("Could not create order:", cause);
       setError(cause instanceof Error ? cause.message : "Order could not be saved. Please try again.");
       setProcessing(false);
@@ -297,7 +291,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
             </label>
           </section>
 
-          {/* <section className="mt-2 bg-white px-4 py-4">
+          <section className="mt-2 bg-white px-4 py-4">
             <label className="flex items-start gap-3 text-[12px] leading-relaxed text-[#535766]">
               <input
                 type="checkbox"
@@ -312,7 +306,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                 my order will be confirmed only after the payment is verified.
               </span>
             </label>
-          </section> */}
+          </section>
 
           {!upiReady && (
             <p role="alert" className="mx-4 mt-3 rounded-lg bg-amber-50 p-3 text-[13px] text-amber-900">
@@ -340,6 +334,98 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
             </button>
           </div>
         </>
+      )}
+
+      {pendingOrder && paymentPopupOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 px-4 py-6"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setPaymentPopupOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-popup-title"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="payment-popup-title" className="text-lg font-extrabold text-[#1a2024]">
+                  Order saved
+                </h2>
+                <p className="mt-1 text-[13px] text-[#535766]">
+                  Complete payment in your selected app. We will verify it manually.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close payment popup"
+                onClick={() => setPaymentPopupOpen(false)}
+                className="rounded-full px-3 py-1 text-xl leading-none text-[#777] hover:bg-gray-100"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f7f7f9] p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={UPI_OPTIONS.find(({ app }) => app === selectedApp)?.icon ?? UPI_OPTIONS[0].icon}
+                alt=""
+                className="h-12 w-12 rounded-lg object-contain"
+              />
+              <div className="min-w-0">
+                <p className="font-bold text-[#353543]">
+                  {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"}
+                </p>
+                <p className="break-all text-xs text-[#777]">Order ID: {pendingOrder.id}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-2 rounded-xl border border-[#e5e5eb] p-3 text-[13px]">
+              <p className="font-semibold text-[#353543]">Order details</p>
+              <ul className="space-y-1 text-[#535766]">
+                {pendingOrder.items.map((item, index) => (
+                  <li key={`${pendingOrder.id}-${index}`} className="flex justify-between gap-3">
+                    <span className="min-w-0">{item.name} × {item.qty}{item.size ? ` · ${item.size}` : ""}</span>
+                    <span className="shrink-0">{formatPrice(item.price * item.qty)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-between border-t border-[#e5e5eb] pt-2 font-bold text-[#1a2024]">
+                <span>{pendingOrder.paymentMode === COD_MODE ? "Pay COD advance" : "Pay now"}</span>
+                <span>{formatPrice(pendingOrder.advanceAmount)}</span>
+              </div>
+              {pendingOrder.paymentMode === COD_MODE && (
+                <div className="flex justify-between text-[#535766]">
+                  <span>Balance due on delivery</span>
+                  <span>{formatPrice(pendingOrder.balanceDue)}</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="btn-brand mt-4 w-full"
+              onClick={() => openPaymentApp(paymentLink)}
+            >
+              Open {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"} and pay {formatPrice(pendingOrder.advanceAmount)}
+            </button>
+            <button
+              type="button"
+              className="mt-2 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
+              onClick={() => openPaymentApp(fallbackPaymentLink)}
+            >
+              Open another UPI app
+            </button>
+            <p className="mt-3 text-center text-[11px] leading-relaxed text-[#777]">
+              Check the recipient and amount in your UPI app before approving. Order confirmation is
+              pending manual payment verification.
+            </p>
+          </section>
+        </div>
       )}
     </div>
   );
