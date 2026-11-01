@@ -35,6 +35,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
   const [processing, setProcessing] = useState(false);
   const [canContinue, setCanContinue] = useState(false);
   const [error, setError] = useState("");
+  const [paymentNotice, setPaymentNotice] = useState("");
   const selectedApp = selectedMode === COD_MODE
     ? codApp
     : UPI_OPTIONS.find(({ app }) => modeForApp[app] === selectedMode)?.app ?? "gpay";
@@ -78,6 +79,8 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
 
     setProcessing(true);
     setError("");
+    setPaymentNotice("");
+    const paymentWindow = window.open("about:blank", "_blank");
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -101,8 +104,14 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
       setPaymentLink(result.paymentLink);
       setFallbackPaymentLink(result.fallbackPaymentLink);
       saveOrder(result.order);
-      openPaymentApp(result.paymentLink);
+      if (paymentWindow) {
+        paymentWindow.location.href = result.paymentLink;
+      } else {
+        setPaymentNotice("Your order is saved. If the payment app did not open, use the button below to open it.");
+        setCanContinue(true);
+      }
     } catch (cause) {
+      paymentWindow?.close();
       console.error("Could not create order:", cause);
       setError(cause instanceof Error ? cause.message : "Order could not be saved. Please try again.");
       setProcessing(false);
@@ -127,6 +136,11 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
             {pendingOrder.paymentMode === COD_MODE ? " advance" : " payment"} in your UPI app.
             We will confirm the order after manually verifying the transfer.
           </p>
+          {paymentNotice && (
+            <p role="status" className="mt-3 rounded-lg bg-amber-50 p-3 text-[13px] text-amber-900">
+              {paymentNotice}
+            </p>
+          )}
           <div className="mt-4 rounded-xl bg-[#f7f7f9] p-4 text-[14px]">
             <div className="flex justify-between gap-3">
               <span>{pendingOrder.paymentMode === COD_MODE ? "UPI advance" : "UPI payment"}</span>
