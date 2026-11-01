@@ -19,7 +19,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
   const [paymentPopupOpen, setPaymentPopupOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<string>(COD_MODE);
   const [allowMetaMeasurement, setAllowMetaMeasurement] = useState(false);
-  const [paymentAcknowledged, setPaymentAcknowledged] = useState(false);
+  const [paymentAcknowledged, setPaymentAcknowledged] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [canContinue, setCanContinue] = useState(false);
   const [error, setError] = useState("");
@@ -198,7 +198,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                   className="h-4 w-4 accent-[#9f2089]"
                 />
                 <span className="flex-1">
-                  <strong className="block text-[14px] text-[#353543]">All UPI apps</strong>
+                  <strong className="block text-[14px] text-[#353543]">Pay via UPI</strong>
                   <span className="text-[12px] text-[#777]">Choose any UPI app to pay the full order total</span>
                 </span>
               </label>
@@ -332,7 +332,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
             </div>
 
             <div className="mt-4 rounded-xl bg-[#f7f7f9] p-3">
-              <p className="font-bold text-[#353543]">All UPI apps</p>
+              <p className="font-bold text-[#353543]">Pay via UPI</p>
               <p className="break-all text-xs text-[#777]">Order ID: {pendingOrder.id}</p>
             </div>
 

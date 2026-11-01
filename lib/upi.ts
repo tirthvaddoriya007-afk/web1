@@ -33,9 +33,7 @@ export function buildUpiLink(opts: {
     am: amount.toFixed(2),
     cu: "INR",
     tn: `${purpose} ${orderId}`,
-    tr: orderId,
   });
-  if (config.merchantCode.trim()) params.set("mc", config.merchantCode.trim());
   return `${app ? APP_SCHEMES[app] : "upi://pay"}?${params.toString()}`;
 }
 
