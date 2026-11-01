@@ -4,41 +4,64 @@ export interface UpiConfig {
   merchantCode: string;
 }
 
-export const UPI_APPS = ["gpay", "phonepe", "paytm"] as const;
-export type UpiApp = (typeof UPI_APPS)[number];
-
-const APP_SCHEMES: Record<UpiApp, string> = {
-  gpay: "tez://upi/pay",
-  phonepe: "phonepe://pay",
-  paytm: "paytmmp://pay",
-};
-
 export const emptyUpiConfig: UpiConfig = {
   vpa: "",
   payeeName: "",
   merchantCode: "",
 };
 
+function generateUpiPayload(vpa: string, payeeName: string, amount: number, orderId: string): string {
+  const data = {
+    p2pPaymentCheckoutParams: {
+      isByDefaultKnownContact: true,
+      enableSpeechToText: false,
+      allowAmountEdit: false,
+      showQrCodeOption: false,
+      disableViewHistory: true,
+      shouldShowUnsavedContactBanner: false,
+      isRecurring: false,
+      checkoutType: "COLLECT",
+      transactionContext: "p2p",
+      initialAmount: Math.round(amount * 100),
+      disableNotesEdit: true,
+      currency: "INR",
+      shouldShowMaskedNumber: true,
+      note: {
+        type: "text",
+        message: `Orderid-${orderId}`,
+      },
+      supportedInstruments: -1,
+    },
+    contact: {
+      type: "EXTERNAL_MERCHANT",
+      name: payeeName,
+      vpa,
+    },
+  };
+  return Buffer.from(JSON.stringify(data), "utf8").toString("base64");
+}
+
 export function buildUpiLink(opts: {
   config: UpiConfig;
   amount: number;
   orderId: string;
-  app?: UpiApp;
-  purpose?: "COD advance" | "Order payment";
+  isIOS?: boolean;
 }): string {
-  const { config, amount, orderId, app, purpose = "Order payment" } = opts;
-  const params = new URLSearchParams({
-    pa: config.vpa.trim(),
-    pn: config.payeeName.trim() || "Merchant",
-    am: amount.toFixed(2),
-    cu: "INR",
-    tn: `${purpose} ${orderId}`,
-  });
-  return `${app ? APP_SCHEMES[app] : "upi://pay"}?${params.toString()}`;
+  const { config, amount, orderId, isIOS = false } = opts;
+  const vpa = config.vpa.trim();
+  const payeeName = config.payeeName.trim() || "Merchant";
+
+  if (isIOS) {
+    return (
+      `phonepe:upi://pay?pa=${encodeURIComponent(vpa)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&am=${amount.toFixed(2)}&cu=INR` +
+      `&tn=${encodeURIComponent(`Orderid-${orderId}`)}`
+    );
+  }
+
+  const payload = generateUpiPayload(vpa, payeeName, amount, orderId);
+  return `phonepe://native?data=${payload}&id=p2ppayment`;
 }
 
 export const upiConfigured = (config: UpiConfig) => config.vpa.includes("@");
-
-export function isUpiApp(value: unknown): value is UpiApp {
-  return typeof value === "string" && UPI_APPS.includes(value as UpiApp);
-}

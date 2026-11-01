@@ -87,6 +87,9 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
           address,
           paymentMode: isCod ? COD_MODE : selectedMode,
           metaMeasurementConsent: allowMetaMeasurement,
+          isIOS:
+            /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1),
         }),
       });
       const result = await response.json().catch(() => null) as
@@ -167,7 +170,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
           <section className="bg-white mt-2 px-4 py-5">
             <h1 className="text-[18px] font-extrabold text-[#1a2024]">Choose how to pay</h1>
             <p className="mt-2 text-[13px] leading-relaxed text-[#535766]">
-              Pay the full order total by UPI, or choose Cash on Delivery with a UPI advance of up to ₹100.
+              Pay the full order total with PhonePe, or choose Cash on Delivery with a UPI advance of up to ₹100.
               Transfers are manually verified before an order is confirmed.
             </p>
           </section>
@@ -199,7 +202,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                 />
                 <span className="flex-1">
                   <strong className="block text-[14px] text-[#353543]">Pay via UPI</strong>
-                  <span className="text-[12px] text-[#777]">Choose any UPI app to pay the full order total</span>
+                  <span className="text-[12px] text-[#777]">Opens PhonePe Native Collect to pay the full order total</span>
                 </span>
               </label>
             </div>
@@ -230,7 +233,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
             </div>
             {isCod && (
               <p className="mt-4 border-t pt-3 text-[12px] text-[#777]">
-                Pay the advance using any UPI app from the UPI chooser.
+                Pay the advance using PhonePe Native Collect.
               </p>
             )}
           </section>
@@ -318,7 +321,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                   Order saved
                 </h2>
                 <p className="mt-1 text-[13px] text-[#535766]">
-                  Complete payment in your selected app. We will verify it manually.
+                  Complete payment in PhonePe. We will verify it manually.
                 </p>
               </div>
               <button
@@ -363,7 +366,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               className="btn-brand mt-4 w-full"
               onClick={() => openPaymentApp(paymentLink)}
             >
-              Open UPI app and pay {formatPrice(pendingOrder.advanceAmount)}
+              Open PhonePe and pay {formatPrice(pendingOrder.advanceAmount)}
             </button>
             <p className="mt-3 text-center text-[11px] leading-relaxed text-[#777]">
               Check the recipient and amount in your UPI app before approving. Order confirmation is

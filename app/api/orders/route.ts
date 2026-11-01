@@ -19,6 +19,7 @@ interface CreateOrderRequest {
   address: Address;
   paymentMode: string;
   metaMeasurementConsent: boolean;
+  isIOS: boolean;
 }
 
 function isAddress(value: unknown): value is Address {
@@ -50,7 +51,8 @@ function isOrderRequest(value: unknown): value is CreateOrderRequest {
     ) &&
     isAddress(request.address) &&
     typeof request.paymentMode === "string" && PAYMENT_MODES.has(request.paymentMode) &&
-    typeof request.metaMeasurementConsent === "boolean"
+    typeof request.metaMeasurementConsent === "boolean" &&
+    typeof request.isIOS === "boolean"
   );
 }
 
@@ -155,7 +157,7 @@ export async function POST(request: NextRequest) {
       config: upi,
       amount: advanceAmount,
       orderId: id,
-      purpose: isCod ? "COD advance" : "Order payment",
+      isIOS: payload.isIOS,
     });
 
     const cookies = request.cookies;
