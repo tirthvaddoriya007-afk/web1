@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Address, CartItem, Order } from "@/lib/types";
+import { brand } from "@/lib/brand";
+import { getPaytmConfig, initiatePaytmTransaction } from "@/lib/paytm";
 import { createAdminClient } from "@/lib/supabase/server";
-import { getUpiConfig } from "@/lib/settings";
-import { buildUpiLink, isUpiApp, type UpiApp } from "@/lib/upi";
 
 export const runtime = "nodejs";
 
 const COD_MODE = "Cash on Delivery";
-const PAYMENT_MODE_FOR_APP: Record<UpiApp, string> = {
-  gpay: "UPI - Google Pay",
-  phonepe: "UPI - PhonePe",
-  paytm: "UPI - Paytm",
-};
-const PAYMENT_MODES = new Set([COD_MODE, ...Object.values(PAYMENT_MODE_FOR_APP)]);
+const PAYTM_MODE = "Paytm Payment Gateway";
+const PAYMENT_MODES = new Set([COD_MODE, PAYTM_MODE]);
 const MAX_ITEMS = 50;
 const MAX_QUANTITY = 50;
 const MAX_TOTAL_ITEMS = 100;
@@ -22,7 +18,6 @@ interface CreateOrderRequest {
   items: { hash: string; qty: number; size?: string }[];
   address: Address;
   paymentMode: string;
-  upiApp: UpiApp;
   metaMeasurementConsent: boolean;
 }
 
@@ -55,8 +50,6 @@ function isOrderRequest(value: unknown): value is CreateOrderRequest {
     ) &&
     isAddress(request.address) &&
     typeof request.paymentMode === "string" && PAYMENT_MODES.has(request.paymentMode) &&
-    isUpiApp(request.upiApp) &&
-    (request.paymentMode === COD_MODE || PAYMENT_MODE_FOR_APP[request.upiApp] === request.paymentMode) &&
     typeof request.metaMeasurementConsent === "boolean"
   );
 }
@@ -91,10 +84,11 @@ export async function POST(request: NextRequest) {
   const totalItems = payload.items.reduce((sum, item) => sum + item.qty, 0);
   if (totalItems > MAX_TOTAL_ITEMS) return responseError("Too many items in this order.", 400);
 
-  const upi = await getUpiConfig();
-  if (!upi.vpa || !upi.vpa.includes("@")) {
-    console.error("Order creation is unavailable because UPI payment settings are not configured.");
-    return responseError("UPI payments are not configured. Please contact support.", 503);
+  try {
+    getPaytmConfig();
+  } catch (error) {
+    console.error("Order creation is unavailable because Paytm is not configured:", error);
+    return responseError("Paytm checkout is not configured. Please contact support.", 503);
   }
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -153,24 +147,11 @@ export async function POST(request: NextRequest) {
       advanceAmount,
       balanceDue,
       address: payload.address,
-      paymentMode: payload.paymentMode,
+      paymentMode: isCod ? COD_MODE : PAYTM_MODE,
       paymentStatus: "Pending",
       status: isCod ? "Awaiting advance" : "Awaiting payment",
       placedAt,
     };
-    const paymentLink = buildUpiLink({
-      config: upi,
-      amount: advanceAmount,
-      orderId: id,
-      app: payload.upiApp,
-      purpose: isCod ? "COD advance" : "Order payment",
-    });
-    const fallbackPaymentLink = buildUpiLink({
-      config: upi,
-      amount: advanceAmount,
-      orderId: id,
-      purpose: isCod ? "COD advance" : "Order payment",
-    });
 
     const cookies = request.cookies;
     const forwardedFor = request.headers.get("x-forwarded-for");
@@ -185,6 +166,7 @@ export async function POST(request: NextRequest) {
       advance_amount: order.advanceAmount,
       balance_due: order.balanceDue,
       payment_mode: order.paymentMode,
+      payment_provider: "paytm",
       status: order.status,
       payment_status: order.paymentStatus,
       placed_at: order.placedAt,
@@ -204,7 +186,31 @@ export async function POST(request: NextRequest) {
       return responseError("Could not save your order. Please try again.", 502);
     }
 
-    return NextResponse.json({ order, paymentLink, fallbackPaymentLink }, { status: 201 });
+    let gateway: Awaited<ReturnType<typeof initiatePaytmTransaction>>;
+    try {
+      gateway = await initiatePaytmTransaction({
+        orderId: order.id,
+        amount: order.advanceAmount,
+        customerPhone: order.address.number,
+        callbackUrl: new URL("/api/paytm/callback", brand.siteUrl).toString(),
+      });
+    } catch (error) {
+      const { error: cancelError } = await supabase
+        .from("orders")
+        .update({ status: "Cancelled" })
+        .eq("id", order.id)
+        .eq("payment_status", "Pending");
+      if (cancelError) {
+        console.error("Could not cancel an order after Paytm checkout failed:", cancelError.message);
+      }
+      console.error("Could not start Paytm checkout:", error);
+      return responseError(
+        error instanceof Error ? error.message : "Paytm could not start checkout. Please try again.",
+        502
+      );
+    }
+
+    return NextResponse.json({ order, gateway }, { status: 201 });
   } catch (error) {
     console.error("Order creation failed:", error);
     return responseError("Could not save your order. Please try again.", 500);

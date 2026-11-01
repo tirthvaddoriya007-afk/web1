@@ -6,40 +6,30 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { formatPrice } from "@/lib/data";
 import CheckoutSteps from "@/components/CheckoutSteps";
-import type { UpiApp } from "@/lib/upi";
 import type { Order } from "@/lib/types";
 
-const UPI_OPTIONS: { app: UpiApp; label: string; icon: string }[] = [
-  { app: "gpay", label: "Google Pay", icon: "/banners/gpa.png" },
-  { app: "phonepe", label: "PhonePe", icon: "/banners/phonepe.png" },
-  { app: "paytm", label: "Paytm", icon: "/banners/pam.png" },
-];
-
 const COD_MODE = "Cash on Delivery";
-const modeForApp: Record<UpiApp, string> = {
-  gpay: "UPI - Google Pay",
-  phonepe: "UPI - PhonePe",
-  paytm: "UPI - Paytm",
-};
+const PAYTM_MODE = "Paytm Payment Gateway";
 
-export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
+interface GatewayCheckout {
+  mid: string;
+  txnToken: string;
+  checkoutUrl: string;
+}
+
+export default function PaymentClient({ gatewayReady }: { gatewayReady: boolean }) {
   const { items, total, payable, address, saveOrder, ready } = useStore();
   const router = useRouter();
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
-  const [paymentLink, setPaymentLink] = useState("");
-  const [fallbackPaymentLink, setFallbackPaymentLink] = useState("");
+  const [gateway, setGateway] = useState<GatewayCheckout | null>(null);
   const [paymentPopupOpen, setPaymentPopupOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<string>(COD_MODE);
-  const [codApp, setCodApp] = useState<UpiApp>("gpay");
   const [allowMetaMeasurement, setAllowMetaMeasurement] = useState(false);
   const [paymentAcknowledged, setPaymentAcknowledged] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [canContinue, setCanContinue] = useState(false);
   const [error, setError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
-  const selectedApp = selectedMode === COD_MODE
-    ? codApp
-    : UPI_OPTIONS.find(({ app }) => modeForApp[app] === selectedMode)?.app ?? "gpay";
   const isCod = selectedMode === COD_MODE;
   const paymentAmount = isCod ? Math.round(Math.min(100, payable) * 100) / 100 : payable;
   const balanceDue = Math.round((payable - paymentAmount) * 100) / 100;
@@ -61,20 +51,14 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
     };
   }, [pendingOrder]);
 
-  const openPaymentApp = (link: string) => {
-    if (!link) return;
-    window.location.assign(link);
-    window.setTimeout(() => setCanContinue(true), 1800);
-  };
-
   const createOrderAndPay = async () => {
     if (!paymentAcknowledged) {
       setError("Please confirm that you understand the payment terms before continuing.");
       return;
     }
 
-    if (!upiReady) {
-      setError("UPI payments are not configured. Please contact support before placing an order.");
+    if (!gatewayReady) {
+      setError("Paytm checkout is not configured. Please contact support before placing an order.");
       return;
     }
 
@@ -88,21 +72,27 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
         body: JSON.stringify({
           items: items.map(({ hash, qty, size }) => ({ hash, qty, size })),
           address,
-          paymentMode: isCod ? COD_MODE : selectedMode,
-          upiApp: selectedApp,
+          paymentMode: isCod ? COD_MODE : PAYTM_MODE,
           metaMeasurementConsent: allowMetaMeasurement,
         }),
       });
       const result = await response.json().catch(() => null) as
-        | { order?: Order; paymentLink?: string; fallbackPaymentLink?: string; error?: string }
+        | { order?: Order; gateway?: GatewayCheckout; error?: string }
         | null;
-      if (!response.ok || !result?.order || !result.paymentLink || !result.fallbackPaymentLink) {
+      if (!response.ok || !result?.order || !result.gateway?.mid || !result.gateway.txnToken || !result.gateway.checkoutUrl) {
         throw new Error(result?.error || "Order could not be saved.");
       }
 
+      const checkoutUrl = new URL(result.gateway.checkoutUrl);
+      if (
+        !["https://securegw.paytm.in", "https://securegw-stage.paytm.in"].includes(checkoutUrl.origin) ||
+        checkoutUrl.pathname !== "/theia/api/v1/showPaymentPage"
+      ) {
+        throw new Error("Paytm returned an invalid checkout page.");
+      }
+
       setPendingOrder(result.order);
-      setPaymentLink(result.paymentLink);
-      setFallbackPaymentLink(result.fallbackPaymentLink);
+      setGateway(result.gateway);
       saveOrder(result.order);
       setPaymentPopupOpen(true);
     } catch (cause) {
@@ -127,8 +117,8 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
           <h1 className="text-[19px] font-extrabold text-[#1a2024]">Payment verification pending</h1>
           <p className="mt-2 text-[13px] leading-relaxed text-[#535766]">
             Order {pendingOrder.id} is saved, but is not confirmed yet. Complete the
-            {pendingOrder.paymentMode === COD_MODE ? " advance" : " payment"} in your UPI app.
-            We will confirm the order after manually verifying the transfer.
+            {pendingOrder.paymentMode === COD_MODE ? " COD advance" : " online payment"} on Paytm checkout.
+            We will confirm the order only after Paytm verifies the payment with our server.
           </p>
           {paymentNotice && (
             <p role="status" className="mt-3 rounded-lg bg-amber-50 p-3 text-[13px] text-amber-900">
@@ -137,7 +127,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
           )}
           <div className="mt-4 rounded-xl bg-[#f7f7f9] p-4 text-[14px]">
             <div className="flex justify-between gap-3">
-              <span>{pendingOrder.paymentMode === COD_MODE ? "UPI advance" : "UPI payment"}</span>
+              <span>{pendingOrder.paymentMode === COD_MODE ? "COD advance" : "Paytm payment"}</span>
               <strong>{formatPrice(pendingOrder.advanceAmount)}</strong>
             </div>
             {pendingOrder.paymentMode === COD_MODE && (
@@ -147,24 +137,19 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               </div>
             )}
             <p className="mt-3 border-t border-[#e5e5eb] pt-3 text-[12px] text-[#535766]">
-              Your payment app will show the recipient and amount before you approve the transfer.
-              Payments are manually verified; returning here does not confirm payment.
+              Pay only through the secure Paytm checkout. Returning to this page does not itself confirm payment.
             </p>
           </div>
-          <button
-            type="button"
-            className="mt-4 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
-            onClick={() => openPaymentApp(paymentLink)}
-          >
-            Reopen {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"} app
-          </button>
-          <button
-            type="button"
-            className="mt-2 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
-            onClick={() => openPaymentApp(fallbackPaymentLink)}
-          >
-            Choose another UPI app
-          </button>
+          {gateway && (
+            <form method="post" action={gateway.checkoutUrl}>
+              <input type="hidden" name="mid" value={gateway.mid} />
+              <input type="hidden" name="orderId" value={pendingOrder.id} />
+              <input type="hidden" name="txnToken" value={gateway.txnToken} />
+              <button type="submit" className="btn-brand mt-4 w-full">
+                Continue to Paytm checkout
+              </button>
+            </form>
+          )}
           {canContinue && (
             <button type="button" className="btn-brand mt-3 w-full" onClick={continueToStatus}>
               View order status
@@ -179,8 +164,8 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
           <section className="bg-white mt-2 px-4 py-5">
             <h1 className="text-[18px] font-extrabold text-[#1a2024]">Choose how to pay</h1>
             <p className="mt-2 text-[13px] leading-relaxed text-[#535766]">
-              Pay the full order total by UPI, or choose Cash on Delivery with a UPI advance of up to ₹100.
-              Transfers are manually verified before an order is confirmed.
+              Pay securely by UPI through Paytm checkout, or choose Cash on Delivery with a Paytm advance of up to ₹100.
+              Orders are confirmed only after the payment is verified directly with Paytm.
             </p>
           </section>
 
@@ -201,26 +186,19 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                 </span>
               </label>
 
-              {UPI_OPTIONS.map(({ app, label, icon }) => (
-                <label
-                  key={app}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${selectedMode === modeForApp[app] ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}
-                >
-                  <input
-                    type="radio"
-                    name="payment-method"
-                    checked={selectedMode === modeForApp[app]}
-                    onChange={() => setSelectedMode(modeForApp[app])}
-                    className="h-4 w-4 accent-[#9f2089]"
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={icon} alt="" className="h-9 w-9 rounded object-contain" />
-                  <span className="flex-1">
-                    <strong className="block text-[14px] text-[#353543]">{label}</strong>
-                    <span className="text-[12px] text-[#777]">Pay the full order total now</span>
-                  </span>
-                </label>
-              ))}
+              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${!isCod ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}>
+                <input
+                  type="radio"
+                  name="payment-method"
+                  checked={!isCod}
+                  onChange={() => setSelectedMode(PAYTM_MODE)}
+                  className="h-4 w-4 accent-[#9f2089]"
+                />
+                <span className="flex-1">
+                  <strong className="block text-[14px] text-[#353543]">Pay online by UPI</strong>
+                  <span className="text-[12px] text-[#777]">Pay the full order total through Paytm secure checkout</span>
+                </span>
+              </label>
             </div>
 
           </section>
@@ -238,7 +216,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                 <span>Order total</span><span className="font-bold">{formatPrice(payable)}</span>
               </div>
               <div className="flex justify-between py-1 text-[14px]">
-                <span>{isCod ? "Pay now by UPI" : "Pay in UPI app"}</span>
+                <span>{isCod ? "Pay COD advance" : "Pay online by UPI"}</span>
                 <span className="font-bold">{formatPrice(paymentAmount)}</span>
               </div>
               {isCod && (
@@ -247,30 +225,6 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                 </div>
               )}
             </div>
-            {isCod && (
-              <fieldset className="mt-4 border-t pt-3">
-                <legend className="mb-2 text-[13px] font-semibold text-[#535766]">Choose an app for the advance</legend>
-                <div className="grid grid-cols-3 gap-2">
-                  {UPI_OPTIONS.map(({ app, label, icon }) => (
-                    <label
-                      key={app}
-                      className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-center ${codApp === app ? "border-[#9f2089] bg-[#fff9fe]" : "border-[#e5e5eb]"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="cod-upi-app"
-                        checked={codApp === app}
-                        onChange={() => setCodApp(app)}
-                        className="h-4 w-4 accent-[#9f2089]"
-                      />
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={icon} alt="" className="h-8 w-8 rounded object-contain" />
-                      <span className="text-[11px] font-semibold text-[#535766]">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
           </section>
 
           <section className="mt-2 bg-white px-4 py-4">
@@ -302,15 +256,15 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               />
               <span>
                 <strong className="text-[#353543]">Required:</strong>{" "}
-                I understand that UPI payments, including the COD advance, are manually verified and
-                my order will be confirmed only after the payment is verified.
+                I understand that payment will be completed through Paytm checkout and my order will
+                be confirmed only after Paytm verifies the payment with the store.
               </span>
             </label>
           </section>
 
-          {!upiReady && (
+          {!gatewayReady && (
             <p role="alert" className="mx-4 mt-3 rounded-lg bg-amber-50 p-3 text-[13px] text-amber-900">
-              UPI payments are not configured yet, so checkout is unavailable. Please contact support.
+              Paytm checkout is not configured yet, so checkout is unavailable. Please contact support.
             </p>
           )}
           {error && <p role="alert" className="mx-4 mt-3 text-[13px] text-red-600">{error}</p>}
@@ -324,7 +278,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               type="button"
               className="btn-brand"
               onClick={createOrderAndPay}
-              disabled={processing || !upiReady || !address || items.length === 0 || !paymentAcknowledged}
+              disabled={processing || !gatewayReady || !address || items.length === 0 || !paymentAcknowledged}
             >
               {processing
                 ? "Preparing order..."
@@ -356,7 +310,7 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
                   Order saved
                 </h2>
                 <p className="mt-1 text-[13px] text-[#535766]">
-                  Complete payment in your selected app. We will verify it manually.
+                  Continue to Paytm checkout. We will confirm the order after Paytm verifies payment.
                 </p>
               </div>
               <button
@@ -369,19 +323,9 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f7f7f9] p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={UPI_OPTIONS.find(({ app }) => app === selectedApp)?.icon ?? UPI_OPTIONS[0].icon}
-                alt=""
-                className="h-12 w-12 rounded-lg object-contain"
-              />
-              <div className="min-w-0">
-                <p className="font-bold text-[#353543]">
-                  {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"}
-                </p>
-                <p className="break-all text-xs text-[#777]">Order ID: {pendingOrder.id}</p>
-              </div>
+            <div className="mt-4 rounded-xl bg-[#f7f7f9] p-3">
+              <p className="font-bold text-[#353543]">Paytm secure checkout · UPI</p>
+              <p className="break-all text-xs text-[#777]">Order ID: {pendingOrder.id}</p>
             </div>
 
             <div className="mt-3 space-y-2 rounded-xl border border-[#e5e5eb] p-3 text-[13px]">
@@ -406,23 +350,19 @@ export default function PaymentClient({ upiReady }: { upiReady: boolean }) {
               )}
             </div>
 
-            <button
-              type="button"
-              className="btn-brand mt-4 w-full"
-              onClick={() => openPaymentApp(paymentLink)}
-            >
-              Open {UPI_OPTIONS.find(({ app }) => app === selectedApp)?.label ?? "UPI"} and pay {formatPrice(pendingOrder.advanceAmount)}
-            </button>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-lg border border-[#dedee5] px-4 py-3 text-sm font-bold text-[#353543]"
-              onClick={() => openPaymentApp(fallbackPaymentLink)}
-            >
-              Open another UPI app
-            </button>
+            {gateway && (
+              <form method="post" action={gateway.checkoutUrl}>
+                <input type="hidden" name="mid" value={gateway.mid} />
+                <input type="hidden" name="orderId" value={pendingOrder.id} />
+                <input type="hidden" name="txnToken" value={gateway.txnToken} />
+                <button type="submit" className="btn-brand mt-4 w-full">
+                  Pay {formatPrice(pendingOrder.advanceAmount)} on Paytm
+                </button>
+              </form>
+            )}
             <p className="mt-3 text-center text-[11px] leading-relaxed text-[#777]">
-              Check the recipient and amount in your UPI app before approving. Order confirmation is
-              pending manual payment verification.
+              Review the payment method and amount on Paytm before approving. Returning to the store
+              does not confirm payment.
             </p>
           </section>
         </div>

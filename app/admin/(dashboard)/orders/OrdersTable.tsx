@@ -13,6 +13,8 @@ type AdminOrder = {
   advance_amount: number;
   balance_due: number;
   payment_mode: string;
+  payment_provider: string;
+  gateway_transaction_id: string | null;
   payment_status: string;
   status: string;
   placed_at: string;
@@ -124,6 +126,12 @@ export default function OrdersTable({
               ? `Payment verified, but Meta event failed: ${result.metaMessage}`
               : "Payment verified. No Meta Purchase event was sent because customer consent was not recorded.";
         setMessage(note);
+      } else if (payload.action === "verify-paytm-status") {
+        setMessage(result.state === "verified"
+          ? "Paytm confirmed the payment; the order is verified."
+          : result.state === "cancelled-paid"
+            ? "Paytm confirmed payment for this cancelled order. Review the transaction and arrange a refund."
+            : "Paytm has not confirmed a successful payment yet.");
       } else if (payload.action === "retry-purchase-event") {
         setMessage(result.metaEvent === "sent"
           ? "Meta Purchase event sent."
@@ -140,7 +148,7 @@ export default function OrdersTable({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">Verify each UPI transfer against your bank/UPI statement before confirming the order.</p>
+      <p className="text-sm text-gray-600">Paytm orders are checked against Paytm&apos;s payment status. Verify older direct UPI transfers against your bank/UPI statement before confirming them.</p>
       {message && <p role="status" className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900">{message}</p>}
       <section className="rounded-xl bg-white p-4 shadow-sm">
         <h2 className="font-bold text-gray-900">Daily confirmed order totals</h2>
@@ -209,7 +217,12 @@ export default function OrdersTable({
                   <strong className="text-lg text-gray-900">{formatPrice(Number(order.total))}</strong>
                 </div>
                 <p>Payment method: <strong>{order.payment_mode}</strong></p>
-                <p>{order.payment_mode === "Cash on Delivery" ? "UPI advance" : "UPI payment"}: <strong>{formatPrice(Number(order.advance_amount))}</strong> · {order.payment_status}</p>
+                <p>{order.payment_mode === "Cash on Delivery"
+                  ? order.payment_provider === "paytm" ? "Paytm advance" : "UPI advance"
+                  : order.payment_provider === "paytm" ? "Paytm payment" : "UPI payment"}: <strong>{formatPrice(Number(order.advance_amount))}</strong> · {order.payment_status}</p>
+                {order.payment_provider === "paytm" && order.gateway_transaction_id && (
+                  <p>Paytm transaction ID: <strong>{order.gateway_transaction_id}</strong></p>
+                )}
                 {order.payment_mode === "Cash on Delivery" && (
                   <p>Due on delivery: <strong>{formatPrice(Number(order.balance_due))}</strong></p>
                 )}
@@ -227,14 +240,18 @@ export default function OrdersTable({
                 <button
                   type="button"
                   disabled={busy === order.id}
-                  onClick={() => void sendUpdate(order.id, { action: "verify-payment" })}
+                  onClick={() => void sendUpdate(order.id, {
+                    action: order.payment_provider === "paytm" ? "verify-paytm-status" : "verify-payment",
+                  })}
                   className="rounded-lg bg-[#9f2089] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
                 >
                   {busy === order.id
                     ? "Updating..."
-                    : order.payment_mode === "Cash on Delivery"
-                      ? "Verify COD advance and confirm"
-                      : "Verify payment and confirm"}
+                    : order.payment_provider === "paytm"
+                      ? "Check Paytm payment status"
+                      : order.payment_mode === "Cash on Delivery"
+                        ? "Verify COD advance and confirm"
+                        : "Verify payment and confirm"}
                 </button>
                 <button
                   type="button"
@@ -252,9 +269,26 @@ export default function OrdersTable({
               </div>
             )}
 
+            {order.payment_status === "Pending" &&
+              order.status === "Cancelled" &&
+              order.payment_provider === "paytm" && (
+              <button
+                type="button"
+                disabled={busy === order.id}
+                onClick={() => void sendUpdate(order.id, { action: "verify-paytm-status" })}
+                className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-900 disabled:opacity-60"
+              >
+                {busy === order.id ? "Checking..." : "Check Paytm status for cancelled order"}
+              </button>
+            )}
+
             {order.status === "Cancelled" && (
               <p className="text-xs text-amber-800">
-                Check whether any UPI payment was received. Refund the received amount manually to the original UPI account, then contact the customer.
+                {order.payment_provider === "paytm"
+                  ? order.payment_status === "Verified"
+                    ? "A payment was captured for this cancelled order. Review the transaction and arrange a refund from the Paytm dashboard."
+                    : "Check the Paytm transaction status and refund any captured payment from the Paytm dashboard."
+                  : "Check whether any UPI payment was received. Refund the received amount manually to the original UPI account, then contact the customer."}
               </p>
             )}
 

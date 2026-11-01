@@ -55,8 +55,8 @@ function SummaryInner() {
         <p className="text-[13px] text-[#7e808c] mt-1">
           {isPending
             ? isCod
-              ? "We will confirm your COD order after manually verifying the UPI advance."
-              : "We will confirm your order after manually verifying the full UPI payment."
+              ? "We will confirm your COD order after Paytm verifies the advance."
+              : "We will confirm your order after Paytm verifies the full payment."
             : "Your order is being processed."}
         </p>
         <div className="inline-flex items-center gap-2 mt-4 bg-[#faf5f9] border border-[#ecd9e7] rounded-lg px-3 py-2">
@@ -90,7 +90,7 @@ function SummaryInner() {
         </div>
         <div className="mt-2 border-t pt-2 text-[13px]">
           <div className="flex justify-between py-1">
-            <span>{isCod ? "UPI advance" : "UPI payment"}</span><span>{formatPrice(order.advanceAmount ?? 0)}</span>
+            <span>{isCod ? "COD advance" : "Paytm payment"}</span><span>{formatPrice(order.advanceAmount ?? 0)}</span>
           </div>
           {isCod && (
             <div className="flex justify-between py-1">
