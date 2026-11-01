@@ -99,8 +99,8 @@ export default function OrderPage() {
               Payment: {trackedOrder.paymentStatus}
               {trackedOrder.paymentStatus === "Pending"
                 ? trackedOrder.paymentMode === "Cash on Delivery"
-                  ? " — COD advance is awaiting Paytm verification."
-                  : " — Paytm payment is awaiting verification."
+                  ? " — UPI advance is awaiting manual verification."
+                  : " — full UPI payment is awaiting manual verification."
                 : ""}
             </p>
             {trackedOrder.trackingNumber && (
@@ -156,8 +156,8 @@ export default function OrderPage() {
               <p className="mt-2 text-[12px] text-[#777]">
                 {order.paymentStatus === "Pending"
                   ? order.paymentMode === "Cash on Delivery"
-                    ? "COD advance awaiting Paytm verification."
-                    : "Paytm payment awaiting verification."
+                    ? "UPI advance awaiting manual verification."
+                    : "Full UPI payment awaiting manual verification."
                   : "Use the form above to refresh delivery status."}
               </p>
             </section>

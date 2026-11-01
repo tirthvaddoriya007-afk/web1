@@ -1,6 +1,7 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { sendPurchaseEvent } from "@/lib/meta-capi";
-import { verifyAndUpdatePaytmOrder } from "@/lib/paytm-order";
+import { brand } from "@/lib/brand";
+import { META_PIXEL_ID } from "@/lib/meta-config";
 import { createAdminClient, getAdminUser } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -16,6 +17,79 @@ const FULFILLMENT_STATUSES = new Set([
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
+}
+
+function hashPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.length === 10 ? `91${digits}` : digits;
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+async function sendPurchaseEvent(order: Record<string, unknown>) {
+  const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
+  if (!META_PIXEL_ID || !accessToken) return "Meta CAPI is not configured.";
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const userData: Record<string, unknown> = {
+    ph: [hashPhone(String(order.customer_phone))],
+  };
+  if (typeof order.meta_fbp === "string" && order.meta_fbp) userData.fbp = order.meta_fbp;
+  if (typeof order.meta_fbc === "string" && order.meta_fbc) userData.fbc = order.meta_fbc;
+  if (typeof order.meta_client_ip === "string" && order.meta_client_ip) {
+    userData.client_ip_address = order.meta_client_ip;
+  }
+  if (typeof order.meta_user_agent === "string" && order.meta_user_agent) {
+    userData.client_user_agent = order.meta_user_agent;
+  }
+
+  const event = {
+    data: [{
+      event_name: "Purchase",
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: `purchase-${String(order.id)}`,
+      action_source: "website",
+      event_source_url: `${brand.siteUrl}/summary`,
+      user_data: userData,
+      custom_data: {
+        content_ids: items.map((item) => String((item as Record<string, unknown>).hash)),
+        content_type: "product",
+        contents: items.map((item) => {
+          const value = item as Record<string, unknown>;
+          return {
+            id: String(value.hash),
+            quantity: Number(value.qty),
+            item_price: Number(value.price),
+          };
+        }),
+        value: Number(order.total),
+        currency: "INR",
+        num_items: items.reduce((count, item) => count + Number((item as Record<string, unknown>).qty), 0),
+      },
+    }],
+  };
+
+  const graphVersion = process.env.META_GRAPH_API_VERSION || "v24.0";
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(META_PIXEL_ID)}/events?access_token=${encodeURIComponent(accessToken)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+  } catch (error) {
+    console.error("Verified-order Meta Purchase event request failed:", error);
+    return "Could not reach Meta Conversions API.";
+  }
+
+  if (!response.ok) {
+    console.error("Meta rejected a verified-order Purchase event:", response.status, await response.text());
+    return "Meta Conversions API rejected the Purchase event.";
+  }
+  return null;
 }
 
 export async function PATCH(request: NextRequest, context: { params: { id: string } }) {
@@ -61,27 +135,6 @@ export async function PATCH(request: NextRequest, context: { params: { id: strin
   }
   if (!current) return errorResponse("Order not found.", 404);
 
-  if (update.action === "verify-paytm-status") {
-    if (current.payment_provider !== "paytm") {
-      return errorResponse("This order does not use Paytm checkout.", 409);
-    }
-    try {
-      const result = await verifyAndUpdatePaytmOrder(current.id);
-      return NextResponse.json({
-        state: result.state,
-        order: {
-          id: result.orderId,
-          status: result.status,
-          paymentStatus: result.paymentStatus,
-        },
-      });
-    } catch (error) {
-      console.error("Could not check Paytm order status from admin:", error);
-      const message = error instanceof Error ? error.message : "Could not check Paytm payment status.";
-      return errorResponse(message, message === "Order not found." ? 404 : 502);
-    }
-  }
-
   if (update.action === "retry-purchase-event") {
     if (current.payment_status !== "Verified" ||
         (current.payment_mode === "Cash on Delivery" && current.status !== "Delivered")) {
@@ -117,9 +170,6 @@ export async function PATCH(request: NextRequest, context: { params: { id: strin
   }
 
   if (update.action === "verify-payment" || update.action === "verify-advance") {
-    if (current.payment_provider === "paytm") {
-      return errorResponse("Paytm orders must be verified against Paytm status; manual confirmation is disabled.", 409);
-    }
     if (current.status === "Cancelled") return errorResponse("Cancelled orders cannot be confirmed.", 409);
 
     const { error: updateError } = await supabase

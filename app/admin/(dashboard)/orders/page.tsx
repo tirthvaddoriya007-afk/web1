@@ -11,7 +11,7 @@ export default async function AdminOrdersPage() {
   const [{ data, error }, firstConfirmedPage] = await Promise.all([
     supabase
     .from("orders")
-    .select("id, customer_name, customer_phone, address, items, total, advance_amount, balance_due, payment_mode, payment_provider, gateway_transaction_id, payment_status, status, placed_at, tracking_number, tracking_url, meta_measurement_consent, purchase_event_sent_at")
+    .select("id, customer_name, customer_phone, address, items, total, advance_amount, balance_due, payment_mode, payment_status, status, placed_at, tracking_number, tracking_url, meta_measurement_consent, purchase_event_sent_at")
     .order("placed_at", { ascending: false })
     .limit(200),
     supabase
